@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><title>RedPro</title><meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// Enlaces viejos (por ejemplo …/app) llevan a la app nueva
+(function () {
+  var p = location.pathname, base = p.indexOf('/redpro/') === 0 ? '/redpro/' : '/';
+  var rest = p.slice(base.length);
+  location.replace(base + (/^app\b/.test(rest) ? '#app' : ''));
+})();
+</script></head><body style="font-family:system-ui;background:#163020;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0"><p>Abriendo RedPro…</p></body></html>

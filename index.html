@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RedPro - Red de Abastecimiento</title>
+<meta name="description" content="Plataforma de abastecimiento que conecta comerciantes con proveedores en Argentina.">
+<meta name="theme-color" content="#163020">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="RedPro">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script>
+tailwind.config = { theme: { extend: {
+  colors: { 'verde-pro': '#163020', 'verde-light': '#1e4a2e', 'amarillo-pro': '#facc15' },
+  fontFamily: { sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'] }
+} } };
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+// Base de datos compartida de VentiunGo (no es secreta: la seguridad la dan las reglas de Firestore).
+window.VENTIUN_FIREBASE = {
+  apiKey: "AIzaSyDgPs6NIM_utoOnaitB1gk5nnsnKazmKa0",
+  authDomain: "socio-cafe.firebaseapp.com",
+  projectId: "socio-cafe",
+  storageBucket: "socio-cafe.firebasestorage.app",
+  messagingSenderId: "995147367882",
+  appId: "1:995147367882:web:d7116274e65785a633fb33"
+};
+</script>
+<style>
+html{scroll-behavior:smooth}
+body{margin:0;font-family:"Plus Jakarta Sans",Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+/* ---- Marca (igual que las otras apps de VentiunGo) ---- */
+.brand{display:flex;align-items:center;gap:10px;background:none;border:0;padding:0;color:#fff;cursor:pointer;font:inherit;text-decoration:none}
+.brand-mark{width:40px;height:40px;border-radius:999px;background:#FFF1CC;display:grid;place-items:center;font-size:22px;line-height:1;flex:none;box-shadow:0 0 0 2px rgba(250,204,21,.35)}
+.brand-txt{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left}
+.brand-txt b{font-weight:800;font-size:21px;line-height:1;letter-spacing:-.02em}
+.brand-txt b span{color:#facc15}
+.brand-txt small{font-size:12px;line-height:1;font-weight:600;color:#86efac;letter-spacing:.02em}
+.brand.on-light{color:#163020}
+.brand.on-light .brand-txt small{color:#6b7280}
+/* ---- Estilos de RedPro ---- */
+.landing-hero{background:linear-gradient(135deg,#163020,#1e4a2e,#163020)}
+.landing-card{background:#fff;border-radius:1.5rem;transition:transform .2s,box-shadow .2s;box-shadow:0 4px 24px #1630201a}
+.landing-card:hover{transform:translateY(-4px);box-shadow:0 8px 32px #16302026}
+.gradient-text{-webkit-text-fill-color:transparent;background:linear-gradient(135deg,#facc15,#fbbf24);-webkit-background-clip:text;background-clip:text}
+.app-shell{background:#f5f5f0;flex-direction:column;align-items:center;min-height:100dvh;display:flex}
+.app-header{color:#fff;background:#163020;justify-content:space-between;align-items:center;width:100%;padding:.85rem 1.25rem;display:flex;gap:.75rem;position:sticky;top:0;z-index:40;padding-top:max(.85rem,env(safe-area-inset-top))}
+.app-container{flex:1;width:100%;max-width:448px;padding:1.5rem 1rem 3rem}
+.card-app{background:#fff;border-radius:1.5rem;padding:1.75rem;box-shadow:0 2px 16px #00000012}
+.btn-primary{color:#fff;cursor:pointer;background:#163020;border:none;border-radius:.875rem;width:100%;padding:.875rem 1.5rem;font-size:1rem;font-weight:600;transition:background .2s;font-family:inherit}
+.btn-primary:hover{background:#1e4a2e}
+.btn-primary:disabled{opacity:.6;cursor:wait}
+.btn-secondary{color:#163020;cursor:pointer;background:#fff;border:2px solid #163020;border-radius:.875rem;width:100%;padding:.875rem 1.5rem;font-size:1rem;font-weight:600;transition:all .2s;font-family:inherit}
+.btn-secondary:hover{background:#f0fdf4}
+.btn-yellow{color:#163020;cursor:pointer;background:#facc15;border:none;border-radius:.875rem;width:100%;padding:.875rem 1.5rem;font-size:1rem;font-weight:700;transition:background .2s;font-family:inherit}
+.btn-yellow:hover{background:#eab308}
+.form-input{box-sizing:border-box;border:1.5px solid #e5e7eb;border-radius:.75rem;outline:none;width:100%;padding:.75rem 1rem;font-family:inherit;font-size:.95rem;transition:border-color .2s;background:#fff}
+.form-input:focus{border-color:#163020}
+.form-label{color:#374151;margin-bottom:.375rem;font-size:.875rem;font-weight:600;display:block}
+.plan-card{cursor:pointer;border:2px solid #e5e7eb;border-radius:1rem;padding:1.25rem;transition:all .2s}
+.plan-card.selected{background:#f0fdf4;border-color:#163020}
+.plan-card-destacado{cursor:pointer;background:#fffde7;border:2px solid #facc15;border-radius:1rem;padding:1.25rem;transition:all .2s}
+.plan-card-destacado.selected{background:#fef9c3;border-color:#163020}
+.role-card{cursor:pointer;text-align:center;border:2.5px solid #e5e7eb;border-radius:1.5rem;padding:2rem 1.5rem;transition:all .2s;background:#fff;font-family:inherit}
+.role-card:hover{background:#f0fdf4;border-color:#163020;transform:translateY(-2px)}
+.logo-upload{text-align:center;cursor:pointer;border:2px dashed #d1d5db;border-radius:1rem;padding:1.5rem;transition:border-color .2s}
+.logo-upload:hover{border-color:#163020}
+.toast-container{z-index:9999;flex-direction:column;align-items:center;gap:.5rem;display:flex;position:fixed;bottom:1.5rem;left:50%;transform:translate(-50%);width:max-content;max-width:calc(100% - 32px)}
+.toast{color:#fff;background:#163020;border-radius:2rem;padding:.75rem 1.5rem;font-size:.9rem;font-weight:500;animation:.3s toastIn;box-shadow:0 4px 12px #00000026;text-align:center}
+.toast.error{background:#dc2626}
+.toast.info{background:#2563eb}
+@keyframes toastIn{0%{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.supplier-card{background:#fff;border-radius:1rem;align-items:center;gap:1rem;padding:1rem 1.25rem;transition:box-shadow .2s;display:flex;box-shadow:0 1px 6px #0000000f}
+.supplier-card:hover{box-shadow:0 3px 12px #0000001a}
+.supplier-avatar{color:#facc15;background:#163020;border-radius:.75rem;flex-shrink:0;justify-content:center;align-items:center;width:3rem;height:3rem;font-size:1.1rem;font-weight:700;display:flex;overflow:hidden}
+.badge-destacado{color:#163020;text-transform:uppercase;letter-spacing:.05em;background:#facc15;border-radius:999px;padding:.15rem .5rem;font-size:.7rem;font-weight:700;white-space:nowrap}
+.badge-basico{color:#6b7280;text-transform:uppercase;letter-spacing:.05em;background:#e5e7eb;border-radius:999px;padding:.15rem .5rem;font-size:.7rem;font-weight:700}
+.admin-tab{cursor:pointer;color:#6b7280;background:0 0;border:none;border-radius:.75rem;flex:1;padding:.625rem;font-size:.9rem;font-weight:600;transition:all .2s;font-family:inherit}
+.admin-tab.active{color:#fff;background:#163020}
+.step-dot{background:#d1d5db;border-radius:999px;width:.625rem;height:.625rem;transition:all .3s}
+.step-dot.active{background:#163020;width:1.5rem}
+.step-dot.done{background:#163020}
+.search-input{box-sizing:border-box;background:#fff;border:1.5px solid #e5e7eb;border-radius:2rem;outline:none;width:100%;padding:.625rem 1.25rem .625rem 2.75rem;font-family:inherit;font-size:.9rem;transition:border-color .2s}
+.search-input:focus{border-color:#163020}
+@keyframes fadeIn{0%{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.animate-fadeIn{animation:.25s fadeIn}
+.hdr-btn{background:transparent;border:0;color:#86efac;font:500 .875rem inherit;font-family:inherit;cursor:pointer;padding:.4rem .2rem}
+.hdr-btn:hover{color:#fff}
+.icon-btn{background:rgba(255,255,255,.1);border:0;color:#fff;padding:.4rem;border-radius:.6rem;cursor:pointer;line-height:0}
+.icon-btn:hover{background:rgba(255,255,255,.2)}
+.install-btn{background:#facc15;color:#163020;border:0;border-radius:999px;font:700 .75rem inherit;font-family:inherit;padding:.45rem .8rem;cursor:pointer;white-space:nowrap}
+.link-btn{background:transparent;border:0;cursor:pointer;font-family:inherit;color:#163020;font-weight:600;text-decoration:underline;padding:0}
+.modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:1rem;z-index:100}
+.modal-box{background:#fff;border-radius:1.25rem;max-width:400px;width:100%;padding:1.5rem;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div class="toast-container" id="toasts" aria-live="polite"></div>
+
+<script>
+(function () {
+'use strict';
+// ====================== Datos fijos ======================
+const CATEGORIAS = ["Alimentos y Bebidas","Limpieza e Higiene","Indumentaria","Electrónica","Ferretería","Muebles y Decoración","Salud y Belleza","Papelería","Juguetes","Automotriz","Construcción","Otro"];
+const WA_SUPPORT = '5493415628884';
+const SUP_EMAILS = ['anibalrossia@gmail.com', 'soporte@ventiungo.app'];
+const AUTH_DOMAIN = 'redpro.ventiungo.app';
+const COL = 'redpro', LOGIN = 'redpro_login';
+
+// ====================== Utilidades ======================
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cuitDigits = s => String(s || '').replace(/\D/g, '');
+const fmtCuit = d => d.length === 11 ? d.slice(0, 2) + '-' + d.slice(2, 10) + '-' + d.slice(10) : d;
+function cuitValido(d) {
+  if (!/^\d{11}$/.test(d)) return false;
+  const w = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  let s = 0; for (let i = 0; i < 10; i++) s += +d[i] * w[i];
+  let v = 11 - (s % 11); if (v === 11) v = 0; if (v === 10) v = 9;
+  return v === +d[10];
+}
+function toast(text, type) {
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type || 'success');
+  el.textContent = text;
+  $('#toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+function waNumber(p) {
+  let d = String(p || '').replace(/\D/g, '');
+  if (d.startsWith('0')) d = d.slice(1);
+  if (!d.startsWith('54')) d = '54' + (d.length === 10 && !d.startsWith('9') ? '9' : '') + d;
+  return d;
+}
+const initial = n => esc((String(n || '?').trim()[0] || '?').toUpperCase());
+const avatar = (u, cls) => `<div class="supplier-avatar ${cls || ''}">${u.logo ? `<img src="${esc(u.logo)}" alt="" class="w-full h-full object-cover">` : initial(u.name)}</div>`;
+const badge = (plan, long) => plan === 'destacado' ? `<span class="badge-destacado">⭐ ${long ? 'Proveedor Destacado' : 'Destacado'}</span>` : `<span class="badge-basico">${long ? 'Plan Básico' : 'Básico'}</span>`;
+
+// Achica la imagen del logo (para que la base de datos no se llene)
+function readLogo(file) {
+  return new Promise((ok, fail) => {
+    if (!file) return ok(null);
+    if (!/^image\//.test(file.type)) return fail(new Error('tipo'));
+    if (file.size > 500 * 1024) return fail(new Error('peso'));
+    const fr = new FileReader();
+    fr.onerror = () => fail(new Error('leer'));
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => fail(new Error('leer'));
+      img.onload = () => {
+        const S = 256, c = document.createElement('canvas');
+        const k = Math.min(1, S / Math.max(img.width, img.height));
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+        x.drawImage(img, 0, 0, c.width, c.height);
+        ok(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+// ====================== Firebase ======================
+let DB = null, AUTH = null;
+function fb() {
+  if (DB) return true;
+  try {
+    const app = firebase.apps.find(a => a.name === 'redpro') || firebase.initializeApp(window.VENTIUN_FIREBASE, 'redpro');
+    DB = app.firestore(); AUTH = app.auth();
+    return true;
+  } catch (e) { console.warn(e); return false; }
+}
+// Sesión aparte para crear cuentas desde soporte sin cerrar la propia
+function secAuth() {
+  const app = firebase.apps.find(a => a.name === 'redpro-sec') || firebase.initializeApp(window.VENTIUN_FIREBASE, 'redpro-sec');
+  return app.auth();
+}
+const isSupportUser = u => !!(u && u.email && SUP_EMAILS.includes(u.email.toLowerCase()));
+function errMsg(e) {
+  const c = (e && (e.code || e.message)) || '';
+  if (/network|unavailable/.test(c)) return 'Sin conexión. Revisá internet e intentá de nuevo.';
+  if (/permission/.test(c)) return 'No tenés permiso para hacer eso.';
+  if (/too-many/.test(c)) return 'Demasiados intentos. Esperá unos minutos.';
+  return 'Ocurrió un error. Intentá nuevamente.';
+}
+
+// ====================== Estado ======================
+const S = { view: 'home', role: null, user: null, step: 1, form: null, logo: null, search: '', suppliers: null, admin: null, adminTab: 'comerciantes', busy: false, soporte: false };
+
+function go(view) { S.view = view; render(); window.scrollTo(0, 0); }
+
+// ====================== Encabezado ======================
+function brand(onLight) {
+  return `<a class="brand${onLight ? ' on-light' : ''}" href="./" aria-label="RedPro, Red de abastecimiento, inicio">
+    <span class="brand-mark" aria-hidden="true">🤝</span>
+    <span class="brand-txt"><b>Red<span>Pro</span></b><small>Red de abastecimiento</small></span>
+  </a>`;
+}
+function header(opts) {
+  opts = opts || {};
+  const back = opts.back ? `<button class="icon-btn" data-act="back" aria-label="Volver"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>` : '';
+  const right = (typeof installBtnHtml === 'function' ? installBtnHtml() : '') + (opts.logout ? `<button class="hdr-btn" data-act="logout">Salir</button>` : '');
+  return `<header class="app-header">
+    <div class="flex items-center gap-3 min-w-0">${back}${brand()}${opts.title ? `<span class="hidden sm:inline text-green-300 text-sm">· ${esc(opts.title)}</span>` : ''}</div>
+    <div class="flex items-center gap-2 shrink-0">${right}</div>
+  </header>`;
+}
+
+// ====================== Página de inicio (landing) ======================
+function landing() {
+  const steps = [['01', '📝', 'Registrate', 'Creá tu cuenta como comerciante o proveedor en menos de 2 minutos.'], ['02', '🎯', 'Elegí tu plan', 'Empezá gratis con el plan Básico o potenciá tu visibilidad con Destacado.'], ['03', '🔍', 'Explorá', 'Buscá y filtrá proveedores por categoría, plan y ubicación.'], ['04', '🤝', 'Conectate', 'Contactá directamente con proveedores y hacé crecer tu negocio.']];
+  const bens = [['bg-verde-pro', '🚀', 'Acceso inmediato', 'Conectate con cientos de proveedores verificados al instante. Sin intermediarios, sin demoras.'], ['bg-amarillo-pro', '💎', 'Proveedores destacados', 'Los proveedores con plan Destacado tienen mayor visibilidad y acceso exclusivo a más comerciantes.'], ['bg-verde-pro', '🔒', 'Seguro y confiable', 'Verificamos el CUIT de cada usuario para garantizar que todos los contactos sean negocios reales.']];
+  const li = (c, t) => `<li class="flex items-center gap-3 text-gray-700"><span class="${c} text-lg">${c === 'text-verde-pro' ? '✓' : '★'}</span> ${t}</li>`;
+  return `<div class="min-h-screen bg-white">
+  <header class="bg-verde-pro text-white sticky top-0 z-50" style="padding-top:env(safe-area-inset-top)"><div class="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
+    ${brand()}
+    <div class="flex items-center gap-2">${typeof installBtnHtml === 'function' ? installBtnHtml() : ''}<a href="#app" class="bg-amarillo-pro text-verde-pro font-bold px-5 py-2 rounded-xl text-sm hover:bg-yellow-300 transition-colors">Ingresar</a></div>
+  </div></header>
+  <section class="landing-hero text-white py-24 px-4 relative overflow-hidden">
+    <div class="absolute inset-0 opacity-10" style="background-image:radial-gradient(circle at 20% 50%, #facc15 0%, transparent 60%), radial-gradient(circle at 80% 20%, #22c55e 0%, transparent 60%)"></div>
+    <div class="max-w-4xl mx-auto text-center relative">
+      <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-sm font-medium mb-6 text-green-200"><span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>Plataforma activa en Argentina</div>
+      <h1 class="text-5xl md:text-7xl font-black tracking-tight mb-6 leading-tight">Conectamos <span class="gradient-text">comerciantes</span> con proveedores</h1>
+      <p class="text-xl md:text-2xl text-green-100 max-w-2xl mx-auto mb-10 leading-relaxed">RedPro es la red de abastecimiento que simplifica la conexión entre negocios y sus proveedores de confianza.</p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="#app" class="inline-flex items-center justify-center gap-2 bg-amarillo-pro text-verde-pro font-bold px-8 py-4 rounded-2xl text-lg hover:bg-yellow-300 transition-colors shadow-lg">Comenzar gratis<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+        <a href="#como-funciona" class="inline-flex items-center justify-center gap-2 bg-white/10 text-white font-semibold px-8 py-4 rounded-2xl text-lg hover:bg-white/20 transition-colors border border-white/20">Cómo funciona</a>
+      </div>
+      <div class="mt-16 grid grid-cols-3 gap-8 max-w-lg mx-auto">
+        <div class="text-center"><div class="text-3xl font-black text-amarillo-pro">500+</div><div class="text-sm text-green-300 mt-1">Proveedores</div></div>
+        <div class="text-center"><div class="text-3xl font-black text-amarillo-pro">1.2K+</div><div class="text-sm text-green-300 mt-1">Comerciantes</div></div>
+        <div class="text-center"><div class="text-3xl font-black text-amarillo-pro">24hs</div><div class="text-sm text-green-300 mt-1">Soporte</div></div>
+      </div>
+    </div>
+  </section>
+  <section id="como-funciona" class="py-24 px-4 bg-gray-50"><div class="max-w-5xl mx-auto">
+    <div class="text-center mb-16"><p class="text-verde-pro font-semibold text-sm uppercase tracking-widest mb-3">Proceso simple</p><h2 class="text-4xl font-black text-gray-900 mb-4">¿Cómo funciona?</h2><p class="text-gray-600 text-lg max-w-xl mx-auto">En cuatro pasos simples, tu negocio estará conectado con los mejores proveedores.</p></div>
+    <div class="grid md:grid-cols-4 gap-6">${steps.map(s => `<div class="landing-card p-6 text-center"><div class="text-xs font-black text-verde-pro bg-green-50 inline-block px-2 py-1 rounded-full mb-4">${s[0]}</div><div class="text-4xl mb-3">${s[1]}</div><h3 class="text-lg font-bold text-gray-900 mb-2">${s[2]}</h3><p class="text-gray-600 text-sm leading-relaxed">${s[3]}</p></div>`).join('')}</div>
+  </div></section>
+  <section class="py-24 px-4"><div class="max-w-5xl mx-auto">
+    <div class="text-center mb-16"><p class="text-verde-pro font-semibold text-sm uppercase tracking-widest mb-3">Beneficios</p><h2 class="text-4xl font-black text-gray-900 mb-4">Por qué elegir RedPro</h2></div>
+    <div class="grid md:grid-cols-3 gap-8">${bens.map(b => `<div class="landing-card p-8"><div class="w-14 h-14 ${b[0]} rounded-2xl flex items-center justify-center text-2xl mb-5">${b[1]}</div><h3 class="text-xl font-bold text-gray-900 mb-3">${b[2]}</h3><p class="text-gray-600 leading-relaxed">${b[3]}</p></div>`).join('')}</div>
+  </div></section>
+  <section class="py-24 px-4 bg-verde-pro text-white"><div class="max-w-4xl mx-auto"><div class="grid md:grid-cols-2 gap-12">
+    <div><div class="text-amarillo-pro font-bold text-sm uppercase tracking-widest mb-4">Nuestra Misión</div><h3 class="text-3xl font-black mb-4">Fortalecer el comercio local argentino</h3><p class="text-green-200 leading-relaxed text-lg">Facilitamos el acceso de comerciantes y proveedores a una red de abastecimiento digital, eficiente y confiable, promoviendo el crecimiento de los negocios locales en toda Argentina.</p></div>
+    <div><div class="text-amarillo-pro font-bold text-sm uppercase tracking-widest mb-4">Nuestra Visión</div><h3 class="text-3xl font-black mb-4">La mayor red de abastecimiento del país</h3><p class="text-green-200 leading-relaxed text-lg">Ser la plataforma de referencia que transforme la cadena de abastecimiento en Argentina, conectando a miles de comerciantes y proveedores en un ecosistema digital transparente y accesible.</p></div>
+  </div></div></section>
+  <section class="py-24 px-4 bg-gray-50"><div class="max-w-3xl mx-auto">
+    <div class="text-center mb-16"><p class="text-verde-pro font-semibold text-sm uppercase tracking-widest mb-3">Planes</p><h2 class="text-4xl font-black text-gray-900 mb-4">Precios simples y transparentes</h2><p class="text-gray-600 text-lg">Comenzá gratis, crecé cuando quieras.</p></div>
+    <div class="grid md:grid-cols-2 gap-8">
+      <div class="landing-card p-8 border-2 border-gray-100"><div class="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-2">Plan Básico</div><div class="text-5xl font-black text-gray-900 mb-1">Gratis</div><div class="text-gray-500 text-sm mb-6">Para siempre</div><ul class="space-y-3 mb-8">${['Perfil visible en el directorio', 'Contacto directo con comerciantes', 'Acceso a proveedores básicos', 'Soporte por email'].map(t => li('text-verde-pro', t)).join('')}</ul><a href="#app" class="block text-center bg-verde-pro text-white font-bold py-3 px-6 rounded-xl hover:bg-verde-light transition-colors">Comenzar gratis</a></div>
+      <div class="landing-card p-8 border-2 border-amarillo-pro relative overflow-hidden"><div class="absolute top-4 right-4 bg-amarillo-pro text-verde-pro text-xs font-black px-3 py-1 rounded-full uppercase">Popular</div><div class="text-amarillo-pro text-sm font-semibold uppercase tracking-wide mb-2">Plan Destacado</div><div class="text-5xl font-black text-gray-900 mb-1">$10.000</div><div class="text-gray-500 text-sm mb-6">por mes</div><ul class="space-y-3 mb-8">${['Todo el plan Básico', 'Aparecés primero en búsquedas', 'Visibilidad ante todos los comerciantes', 'Insignia Destacado en tu perfil', 'Soporte prioritario'].map(t => li('text-amarillo-pro', t)).join('')}</ul><a href="#app" class="block text-center bg-amarillo-pro text-verde-pro font-bold py-3 px-6 rounded-xl hover:bg-yellow-300 transition-colors">Elegir Destacado</a></div>
+    </div>
+  </div></section>
+  <section class="py-20 px-4 bg-verde-pro text-white text-center"><div class="max-w-2xl mx-auto"><h2 class="text-4xl font-black mb-4">¿Listo para conectar tu negocio?</h2><p class="text-green-200 text-lg mb-8">Únete a más de 1.700 negocios que ya usan RedPro.</p><a href="#app" class="inline-flex items-center gap-2 bg-amarillo-pro text-verde-pro font-bold px-10 py-4 rounded-2xl text-xl hover:bg-yellow-300 transition-colors shadow-xl">Registrate ahora — es gratis</a></div></section>
+  <footer class="bg-gray-900 text-gray-400 py-12 px-4"><div class="max-w-5xl mx-auto">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">${brand()}<div class="flex gap-6 text-sm"><button data-act="terms" class="hover:text-white transition-colors cursor-pointer bg-transparent border-none text-gray-400">Términos y Condiciones</button><button data-act="privacy" class="hover:text-white transition-colors cursor-pointer bg-transparent border-none text-gray-400">Política de Privacidad</button></div></div>
+    <div class="border-t border-gray-800 pt-8 text-center text-sm">© 2026 RedPro. Todos los derechos reservados. Plataforma para uso dentro de la República Argentina.<br><span class="text-gray-500">Una app de <a href="https://ventiungo.ar" class="hover:text-white">VentiunGo</a></span></div>
+  </div></footer>
+</div>`;
+}
+
+// ====================== App: pantallas ======================
+function vHome() {
+  return header() + `<div class="app-container flex flex-col items-center justify-center" style="min-height:calc(100dvh - 72px)">
+    <div class="text-center mb-10 animate-fadeIn">
+      <div class="w-24 h-24 bg-verde-pro rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg" style="box-shadow:0 0 0 6px #FFF1CC, 0 10px 25px rgba(22,48,32,.25)"><span class="text-5xl">🤝</span></div>
+      <h1 class="text-3xl font-black text-verde-pro mb-2">Red<span class="text-amarillo-pro">Pro</span></h1>
+      <p class="text-gray-500 text-lg">Red de abastecimiento</p>
+      <p class="text-gray-400 text-sm mt-1">Conectamos comerciantes y proveedores</p>
+    </div>
+    <div class="w-full space-y-3 animate-fadeIn">
+      <button class="btn-primary" data-go="role">Registrarme</button>
+      <button class="btn-secondary" data-go="login">Iniciar Sesión</button>
+      <div class="text-center mt-4"><a href="./" class="text-sm text-verde-pro hover:underline font-medium">← Volver al inicio</a></div>
+    </div>
+  </div>`;
+}
+
+function vRole() {
+  return header({ back: 'home' }) + `<div class="app-container animate-fadeIn">
+    <div class="text-center mb-8 mt-4"><h2 class="text-2xl font-black text-gray-900 mb-2">¿Cómo querés usar RedPro?</h2><p class="text-gray-500">Elegí tu tipo de cuenta</p></div>
+    <div class="space-y-4">
+      <button class="role-card w-full" data-role="comerciante"><div class="text-5xl mb-4">🏪</div><h3 class="text-xl font-bold text-gray-900 mb-2">Comerciante</h3><p class="text-gray-500 text-sm">Buscá y conectate con proveedores para abastecer tu negocio.</p></button>
+      <button class="role-card w-full" data-role="proveedor"><div class="text-5xl mb-4">🚚</div><h3 class="text-xl font-bold text-gray-900 mb-2">Proveedor</h3><p class="text-gray-500 text-sm">Ofrecé tus productos y servicios a cientos de comerciantes.</p></button>
+    </div>
+  </div>`;
+}
+
+function catOptions(sel) {
+  return `<option value="">Seleccioná una categoría</option>` + CATEGORIAS.map(c => `<option value="${esc(c)}" ${c === sel ? 'selected' : ''}>${esc(c)}</option>`).join('');
+}
+function logoBox(logo, text) {
+  return `<div class="logo-upload" data-act="pickLogo">${logo ? `<img src="${esc(logo)}" alt="logo" class="w-20 h-20 object-cover rounded-xl mx-auto">` : `<div class="text-3xl mb-1">📷</div><div class="text-sm text-gray-500">${text}</div><div class="text-xs text-gray-400 mt-1">Máx. 500KB</div>`}</div>
+    <input id="logoInput" type="file" accept="image/*" class="hidden">`;
+}
+function plans(sel, compact) {
+  if (compact) return `<div class="space-y-2 mt-1">
+      <div class="plan-card ${sel === 'basico' ? 'selected' : ''}" data-plan="basico"><div class="flex justify-between items-center"><span class="font-semibold">Básico</span><span class="text-verde-pro font-bold">Gratis</span></div></div>
+      <div class="plan-card-destacado ${sel === 'destacado' ? 'selected' : ''}" data-plan="destacado"><div class="flex justify-between items-center"><span class="font-semibold flex items-center gap-2">Destacado <span class="badge-destacado">⭐</span></span><span class="font-bold">$10.000/mes</span></div></div>
+    </div>`;
+  return `<div class="space-y-3 mt-2">
+      <div class="plan-card ${sel === 'basico' ? 'selected' : ''}" data-plan="basico"><div class="flex items-center justify-between"><div><div class="font-bold text-gray-900">Plan Básico</div><div class="text-gray-500 text-sm mt-0.5">Perfil en el directorio, contacto directo</div></div><div class="text-right"><div class="text-xl font-black text-verde-pro">Gratis</div></div></div></div>
+      <div class="plan-card-destacado ${sel === 'destacado' ? 'selected' : ''}" data-plan="destacado"><div class="flex items-center justify-between"><div><div class="font-bold text-gray-900 flex items-center gap-2 flex-wrap">Plan Destacado <span class="badge-destacado">⭐ Popular</span></div><div class="text-gray-500 text-sm mt-0.5">Máxima visibilidad, primero en búsquedas</div></div><div class="text-right"><div class="text-xl font-black text-gray-900">$10.000</div><div class="text-xs text-gray-400">/mes</div></div></div></div>
+    </div>`;
+}
+
+function vRegister() {
+  const f = S.form, who = S.role === 'proveedor' ? 'Proveedor' : 'Comerciante';
+  const step1 = `<div class="space-y-4">
+      <div><label class="form-label">Logo (opcional)</label>${logoBox(S.logo, 'Tocá para subir imagen')}</div>
+      <div><label class="form-label" for="fCuit">CUIT *</label><input id="fCuit" class="form-input" inputmode="numeric" placeholder="20-12345678-9" value="${esc(f.cuit)}"></div>
+      <div><label class="form-label" for="fName">Nombre del negocio *</label><input id="fName" class="form-input" placeholder="Ej: Distribuidora López" value="${esc(f.name)}"></div>
+      <div><label class="form-label" for="fPhone">Teléfono *</label><input id="fPhone" class="form-input" type="tel" placeholder="+54 9 11 1234-5678" value="${esc(f.phone)}"></div>
+      ${S.role === 'proveedor' ? `<div><label class="form-label" for="fCat">Categoría *</label><select id="fCat" class="form-input">${catOptions(f.category)}</select></div>` : ''}
+      <div><label class="form-label" for="fPass">Contraseña *</label><input id="fPass" class="form-input" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres" value="${esc(f.password)}"></div>
+      <button class="btn-primary mt-2" data-act="next">Continuar →</button>
+    </div>`;
+  const step2 = `<div class="space-y-4">
+      <div><label class="form-label" for="fEmail">Email *</label><input id="fEmail" class="form-input" type="email" placeholder="tu@email.com" value="${esc(f.email)}"></div>
+      <div><label class="form-label">Plan</label>${plans(f.plan)}</div>
+      <button class="btn-primary mt-2" data-act="register" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Registrando...' : 'Completar registro'}</button>
+    </div>`;
+  return header({ back: 'regBack' }) + `<div class="app-container animate-fadeIn">
+    <div class="flex items-center justify-center gap-2 mb-6 mt-2"><div class="step-dot ${S.step === 1 ? 'active' : 'done'}"></div><div class="step-dot ${S.step === 2 ? 'active' : ''}"></div></div>
+    <div class="card-app">
+      <h2 class="text-xl font-black text-gray-900 mb-1">${S.step === 1 ? 'Registro ' + who : 'Datos de acceso'}</h2>
+      <p class="text-gray-500 text-sm mb-5">${S.step === 1 ? 'Paso 1 de 2 — Datos principales' : 'Paso 2 de 2 — Email y plan'}</p>
+      ${S.step === 1 ? step1 : step2}
+    </div>
+    <p class="text-center text-sm text-gray-500 mt-4">¿Ya tenés cuenta? <button class="link-btn" data-go="login">Iniciá sesión</button></p>
+  </div>`;
+}
+
+function vLogin() {
+  return header({ back: 'home' }) + `<div class="app-container animate-fadeIn">
+    <div class="text-center mb-6 mt-4"><h2 class="text-2xl font-black text-gray-900 mb-1">Iniciar Sesión</h2><p class="text-gray-500 text-sm">Ingresá con tu CUIT y contraseña</p></div>
+    <form class="card-app space-y-4" id="loginForm" autocomplete="on">
+      <div><label class="form-label" for="lCuit">CUIT</label><input id="lCuit" class="form-input" placeholder="20-12345678-9" autocomplete="username" value="${esc(S.lCuit || '')}"></div>
+      <div><label class="form-label" for="lPass">Contraseña</label><input id="lPass" class="form-input" type="password" placeholder="Tu contraseña" autocomplete="current-password"></div>
+      <button class="btn-primary mt-2" type="submit" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Ingresando...' : 'Ingresar'}</button>
+      <div class="text-center"><button type="button" class="link-btn text-sm" data-act="forgot">¿Olvidaste tu contraseña?</button></div>
+    </form>
+    <p class="text-center text-sm text-gray-500 mt-4">¿No tenés cuenta? <button class="link-btn" data-go="role">Registrate gratis</button></p>
+  </div>`;
+}
+
+function vMerchant() {
+  const u = S.user;
+  let list = S.suppliers;
+  let body;
+  if (!list) body = `<div class="text-center py-12 text-gray-400"><div class="text-3xl mb-2">⏳</div><p>Cargando proveedores...</p></div>`;
+  else {
+    const q = S.search.trim().toLowerCase();
+    list = list.filter(x => u.plan === 'destacado' || x.plan !== 'destacado')
+      .filter(x => !q || (x.name || '').toLowerCase().includes(q) || (x.category || '').toLowerCase().includes(q))
+      .sort((a, b) => (a.plan === 'destacado') === (b.plan === 'destacado') ? (a.name || '').localeCompare(b.name || '') : a.plan === 'destacado' ? -1 : 1);
+    body = !list.length ? `<div class="text-center py-12 text-gray-400"><div class="text-3xl mb-2">🔍</div><p>No se encontraron proveedores</p></div>`
+      : list.map(x => `<div class="supplier-card">${avatar(x)}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap"><span class="font-semibold text-gray-900 truncate">${esc(x.name)}</span>${x.plan === 'destacado' ? badge('destacado') : ''}</div>
+            <div class="text-sm text-gray-500 mt-0.5">${esc(x.category || 'Sin categoría')}</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex flex-wrap gap-x-3">
+              <span>📞 ${esc(x.phone)}</span>${x.email ? `<a class="hover:underline" href="mailto:${esc(x.email)}">📧 ${esc(x.email)}</a>` : ''}
+            </div>
+          </div>
+          ${waNumber(x.phone).length >= 12 ? `<a href="https://wa.me/${waNumber(x.phone)}?text=${encodeURIComponent('¡Hola ' + x.name + '! Te contacto desde RedPro: soy ' + u.name + ' y me interesa abastecerme con ustedes.')}" target="_blank" rel="noopener" class="shrink-0 bg-green-50 text-verde-pro font-bold text-xs px-3 py-2 rounded-xl hover:bg-green-100">WhatsApp</a>` : ''}
+        </div>`).join('');
+  }
+  return header({ title: 'Comerciante', logout: true }) + `<div class="app-container animate-fadeIn">
+    <div class="flex items-center gap-3 mb-5">${avatar(u)}
+      <div class="min-w-0"><div class="font-bold text-gray-900 truncate">${esc(u.name)}</div><div class="text-sm text-gray-500">${badge(u.plan)}</div></div>
+      <button data-go="editProfile" class="ml-auto text-sm text-verde-pro font-medium bg-transparent border-none cursor-pointer">Editar</button>
+    </div>
+    <div class="relative mb-5">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="search" class="search-input" placeholder="Buscar proveedores por nombre o categoría..." value="${esc(S.search)}" aria-label="Buscar proveedores">
+    </div>
+    ${u.plan !== 'destacado' ? `<div class="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 flex items-start gap-2"><span class="text-lg">ℹ️</span><div><div class="text-sm font-semibold text-amber-800">Plan Básico</div><div class="text-xs text-amber-700">Solo ves proveedores con plan Básico. Actualizá a Destacado para ver todos.</div></div></div>` : ''}
+    <div class="space-y-3" id="supList">${body}</div>
+  </div>`;
+}
+
+function row(icon, label, value) {
+  return `<div class="flex items-center gap-3 py-1"><span class="text-lg w-6 text-center">${icon}</span><span class="text-sm text-gray-500 w-20 flex-shrink-0">${label}</span><span class="text-sm text-gray-800 font-medium truncate">${esc(value)}</span></div>`;
+}
+function vSupplier() {
+  const u = S.user;
+  return header({ title: 'Proveedor', logout: true }) + `<div class="app-container animate-fadeIn">
+    <div class="card-app mb-4">
+      <div class="flex items-center gap-4 mb-4">${avatar(u, 'w-16 h-16 text-xl rounded-2xl')}
+        <div class="min-w-0"><div class="font-black text-xl text-gray-900 truncate">${esc(u.name)}</div><div class="mt-1">${badge(u.plan, true)}</div></div>
+      </div>
+      <div class="space-y-2 border-t pt-4">
+        ${row('🏷️', 'Categoría', u.category || 'No especificada')}${row('📞', 'Teléfono', u.phone)}${row('📧', 'Email', u.email || 'No especificado')}${row('🪪', 'CUIT', fmtCuit(u.cuit))}
+      </div>
+    </div>
+    ${u.plan !== 'destacado'
+      ? `<div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-2xl p-4 mb-4"><div class="flex items-center gap-2 mb-2"><span class="text-xl">🚀</span><div class="font-bold text-gray-900">Mejorá tu visibilidad</div></div><p class="text-sm text-gray-600 mb-3">Con el Plan Destacado aparecés primero en las búsquedas y llegan más comerciantes a tu perfil.</p><button data-go="editProfile" class="btn-yellow">Actualizar a Destacado — $10.000/mes</button></div>`
+      : `<div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-4 mb-4"><div class="flex items-center gap-2"><span class="text-xl">⭐</span><div><div class="font-bold text-gray-900">Plan Destacado activo</div><div class="text-sm text-gray-600">Tu perfil aparece primero en búsquedas</div></div></div></div>`}
+    <button class="btn-secondary" data-go="editProfile">✏️ Editar perfil</button>
+  </div>`;
+}
+
+function vEdit() {
+  const u = S.user, f = S.form;
+  return header({ title: 'Editar Perfil', back: 'dash' }) + `<div class="app-container animate-fadeIn"><div class="card-app space-y-4">
+    <div><label class="form-label">Logo</label>${logoBox(S.logo, 'Tocá para cambiar imagen')}</div>
+    <div><label class="form-label" for="eName">Nombre del negocio</label><input id="eName" class="form-input" value="${esc(f.name)}"></div>
+    <div><label class="form-label" for="ePhone">Teléfono</label><input id="ePhone" class="form-input" type="tel" value="${esc(f.phone)}"></div>
+    <div><label class="form-label" for="eEmail">Email</label><input id="eEmail" class="form-input" type="email" value="${esc(f.email)}"></div>
+    ${u.role === 'proveedor' ? `<div><label class="form-label" for="eCat">Categoría</label><select id="eCat" class="form-input">${catOptions(f.category)}</select></div>` : ''}
+    <div><label class="form-label">Plan</label>${plans(f.plan, true)}</div>
+    <div><label class="form-label" for="ePass">Nueva contraseña (opcional)</label><input id="ePass" class="form-input" type="password" autocomplete="new-password" placeholder="Dejá vacío para no cambiar" value="${esc(f.password)}"></div>
+    <div id="eOldWrap" ${f.password ? '' : 'hidden'}><label class="form-label" for="eOld">Contraseña actual</label><input id="eOld" class="form-input" type="password" autocomplete="current-password" placeholder="Para confirmar el cambio"></div>
+    <button class="btn-primary" data-act="saveProfile" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Guardando...' : 'Guardar cambios'}</button>
+  </div></div>`;
+}
+
+function vAdmin() {
+  const A = S.admin;
+  const com = A ? A.filter(x => x.role === 'comerciante') : [], prov = A ? A.filter(x => x.role === 'proveedor') : [];
+  const list = S.adminTab === 'comerciantes' ? com : prov;
+  return header({ title: 'Admin', logout: true }) + `<div class="app-container animate-fadeIn">
+    <div class="text-center mb-4 mt-2"><div class="text-2xl font-black text-gray-900">Panel de Administración</div><div class="text-sm text-gray-500">Gestión de usuarios · Soporte VentiunGo</div></div>
+    <div class="grid grid-cols-2 gap-3 mb-5">
+      <div class="card-app text-center" style="padding:1.25rem"><div class="text-3xl font-black text-verde-pro">${com.length}</div><div class="text-sm text-gray-500">Comerciantes</div></div>
+      <div class="card-app text-center" style="padding:1.25rem"><div class="text-3xl font-black text-verde-pro">${prov.length}</div><div class="text-sm text-gray-500">Proveedores</div></div>
+    </div>
+    <div class="bg-gray-100 rounded-xl p-1 flex gap-1 mb-4">
+      <button class="admin-tab ${S.adminTab === 'comerciantes' ? 'active' : ''}" data-tab="comerciantes">🏪 Comercios (${com.length})</button>
+      <button class="admin-tab ${S.adminTab === 'proveedores' ? 'active' : ''}" data-tab="proveedores">🚚 Proveedores (${prov.length})</button>
+    </div>
+    ${!A ? `<div class="text-center py-8 text-gray-400">Cargando...</div>`
+      : !list.length ? `<div class="text-center py-8 text-gray-400"><div class="text-3xl mb-2">📭</div>No hay ${S.adminTab} registrados</div>`
+      : `<div class="space-y-2">${list.map(m => `<div class="card-app flex items-center gap-3" style="padding:.75rem 1rem">${avatar(m, 'w-10 h-10 text-base')}
+          <div class="flex-1 min-w-0"><div class="font-semibold text-gray-900 text-sm truncate">${esc(m.name)}</div><div class="text-xs text-gray-500">${esc(fmtCuit(m.cuit))} · ${esc(m.phone || '')}</div><div class="mt-0.5 flex items-center gap-2">${badge(m.plan)}<button class="text-xs text-verde-pro font-semibold bg-transparent border-none cursor-pointer" data-plan-toggle="${esc(m.cuit)}">${m.plan === 'destacado' ? 'Pasar a Básico' : 'Pasar a Destacado'}</button></div></div>
+          <div class="flex flex-col items-end gap-1">
+            <button class="text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg px-2 py-1 border-none cursor-pointer" data-reset="${esc(m.cuit)}">🔑 Clave</button>
+            <button class="text-red-500 hover:text-red-700 text-sm font-medium bg-transparent border-none cursor-pointer px-1" title="Eliminar" aria-label="Eliminar ${esc(m.name)}" data-del="${esc(m.cuit)}">🗑️</button>
+          </div>
+        </div>`).join('')}</div>`}
+  </div>`;
+}
+
+// ====================== Render ======================
+function render() {
+  const appMode = location.hash === '#app' || S.view !== 'home' || S.inApp;
+  const root = $('#root');
+  if (!appMode) { root.innerHTML = landing(); return; }
+  const V = { home: vHome, role: vRole, register: vRegister, login: vLogin, merchant: vMerchant, supplier: vSupplier, editProfile: vEdit, admin: vAdmin }[S.view] || vHome;
+  root.innerHTML = `<div class="app-shell">${V()}</div>`;
+  if (S.view === 'login') { const c = $('#lCuit'); if (c && !c.value) c.focus(); else { const pw = $('#lPass'); if (pw) pw.focus(); } }
+}
+
+// ====================== Acciones ======================
+function readStep1() {
+  const f = S.form;
+  f.cuit = $('#fCuit').value.trim(); f.name = $('#fName').value.trim(); f.phone = $('#fPhone').value.trim();
+  if ($('#fCat')) f.category = $('#fCat').value;
+  f.password = $('#fPass').value;
+}
+function validStep1() {
+  const f = S.form, d = cuitDigits(f.cuit);
+  if (!d) return toast('Ingresá tu CUIT', 'error'), false;
+  if (!cuitValido(d)) return toast('El CUIT no es válido. Revisá los 11 números.', 'error'), false;
+  if (!f.name) return toast('Ingresá tu nombre', 'error'), false;
+  if (!f.phone) return toast('Ingresá tu teléfono', 'error'), false;
+  if (S.role === 'proveedor' && !f.category) return toast('Seleccioná una categoría', 'error'), false;
+  if (!f.password || f.password.length < 6) return toast('La contraseña debe tener al menos 6 caracteres', 'error'), false;
+  return true;
+}
+
+async function loadProfile(uid) {
+  const q = await DB.collection(COL).where('uid', '==', uid).limit(1).get();
+  if (q.empty) return null;
+  return q.docs[0].data();
+}
+function enter(user, welcome) {
+  S.user = user; S.soporte = false;
+  S.suppliers = null; S.search = '';
+  go(user.role === 'comerciante' ? 'merchant' : 'supplier');
+  if (welcome) toast(welcome);
+  if (user.role === 'comerciante') loadSuppliers();
+}
+async function loadSuppliers() {
+  try {
+    const q = await DB.collection(COL).where('role', '==', 'proveedor').get();
+    S.suppliers = q.docs.map(d => d.data());
+  } catch (e) { S.suppliers = []; toast('Error al cargar proveedores', 'error'); }
+  if (S.view === 'merchant') { const keep = document.activeElement && document.activeElement.id === 'search'; render(); if (keep) { const s = $('#search'); s.focus(); s.setSelectionRange(s.value.length, s.value.length); } }
+}
+
+async function register() {
+  const f = S.form;
+  f.email = $('#fEmail').value.trim();
+  if (!f.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) return toast('Ingresá tu email', 'error');
+  if (!fb()) return toast('Sin conexión con la base de datos', 'error');
+  const cuit = cuitDigits(f.cuit);
+  S.busy = true; render();
+  try {
+    const ex = await DB.collection(LOGIN).doc(cuit).get();
+    if (ex.exists) throw { code: 'existe' };
+    const authEmail = cuit + '@' + AUTH_DOMAIN;
+    let cred;
+    try { cred = await AUTH.createUserWithEmailAndPassword(authEmail, f.password); }
+    catch (e) {
+      // Cuenta borrada desde soporte: la credencial quedó, se reutiliza si la clave coincide
+      if (e.code === 'auth/email-already-in-use') {
+        try { cred = await AUTH.signInWithEmailAndPassword(authEmail, f.password); } catch (e2) { throw { code: 'existe' }; }
+      } else throw e;
+    }
+    const uid = cred.user.uid;
+    const user = { cuit, uid, role: S.role, name: f.name, phone: f.phone, email: f.email, category: S.role === 'proveedor' ? f.category : '', plan: f.plan, logo: S.logo || null, creado: Date.now() };
+    const b = DB.batch();
+    b.set(DB.collection(COL).doc(cuit), user);
+    b.set(DB.collection(LOGIN).doc(cuit), { authEmail, uid });
+    await b.commit();
+    S.busy = false;
+    enter(user, '¡Registro exitoso! Bienvenido/a a RedPro 🎉');
+  } catch (e) {
+    S.busy = false; render();
+    toast(e && e.code === 'existe' ? 'Ya existe una cuenta con ese CUIT. Iniciá sesión.' : errMsg(e), 'error');
+  }
+}
+
+async function login(cuitIn, pass) {
+  S.lCuit = cuitIn;
+  if (!cuitIn.trim() || !pass) return toast('Completá todos los campos', 'error');
+  if (!fb()) return toast('Sin conexión con la base de datos', 'error');
+  S.busy = true; render();
+  try {
+    // Soporte de VentiunGo: usuario "Ventiungo" y su contraseña
+    if (cuitIn.trim().toLowerCase() === 'ventiungo') {
+      let ok = null;
+      for (const em of SUP_EMAILS) {
+        try { ok = await AUTH.signInWithEmailAndPassword(em, pass); break; }
+        catch (e) { if (!/user-not-found|invalid-credential|invalid-login|wrong-password|invalid-email/.test(e.code || '')) throw e; }
+      }
+      if (!ok) throw { code: 'clave' };
+      S.busy = false; openAdmin(); toast('Soporte VentiunGo: panel de administración'); return;
+    }
+    const cuit = cuitDigits(cuitIn);
+    const l = await DB.collection(LOGIN).doc(cuit).get();
+    if (!l.exists) throw { code: 'clave' };
+    try { await AUTH.signInWithEmailAndPassword(l.data().authEmail, pass); }
+    catch (e) { if (/user-not-found|invalid-credential|invalid-login|wrong-password/.test(e.code || '')) throw { code: 'clave' }; throw e; }
+    const user = await loadProfile(AUTH.currentUser.uid);
+    if (!user) { await AUTH.signOut(); throw { code: 'borrada' }; }
+    S.busy = false;
+    enter(user, `¡Bienvenido/a, ${user.name}!`);
+  } catch (e) {
+    S.busy = false; render();
+    toast(e.code === 'clave' ? 'CUIT o contraseña incorrectos' : e.code === 'borrada' ? 'Esa cuenta fue dada de baja. Escribinos a soporte.' : errMsg(e), 'error');
+  }
+}
+
+async function openAdmin() {
+  S.soporte = true; S.admin = null; S.user = null; go('admin');
+  if (!DB) return;
+  try {
+    const q = await DB.collection(COL).get();
+    S.admin = q.docs.map(d => d.data()).sort((a, b) => (b.creado || 0) - (a.creado || 0));
+  } catch (e) { S.admin = []; toast('Error al cargar usuarios', 'error'); }
+  if (S.view === 'admin') render();
+}
+
+async function saveProfile() {
+  const u = S.user, f = S.form;
+  f.name = $('#eName').value.trim(); f.phone = $('#ePhone').value.trim(); f.email = $('#eEmail').value.trim();
+  if ($('#eCat')) f.category = $('#eCat').value;
+  f.password = $('#ePass').value;
+  const old = ($('#eOld') || {}).value || '';
+  if (!f.name) return toast('Ingresá el nombre', 'error');
+  if (f.password && f.password.length < 6) return toast('La contraseña debe tener al menos 6 caracteres', 'error');
+  S.busy = true; render();
+  try {
+    if (f.password) {
+      if (!old) throw { code: 'old' };
+      const cu = AUTH.currentUser;
+      await cu.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(cu.email, old)).catch(() => { throw { code: 'oldbad' }; });
+      await cu.updatePassword(f.password);
+    }
+    const upd = { name: f.name, phone: f.phone, email: f.email, category: u.role === 'proveedor' ? f.category : '', plan: f.plan, logo: S.logo || null };
+    await DB.collection(COL).doc(u.cuit).update(upd);
+    S.busy = false;
+    S.user = Object.assign({}, u, upd);
+    go(u.role === 'comerciante' ? 'merchant' : 'supplier');
+    toast('Perfil actualizado correctamente');
+    if (u.role === 'comerciante') loadSuppliers();
+  } catch (e) {
+    S.busy = false; render();
+    toast(e.code === 'old' ? 'Escribí tu contraseña actual para cambiarla' : e.code === 'oldbad' ? 'La contraseña actual no es correcta' : 'Error al actualizar. Intentá nuevamente.', 'error');
+  }
+}
+
+async function logout() {
+  try { if (AUTH) await AUTH.signOut(); } catch (e) {}
+  S.user = null; S.soporte = false; S.admin = null; S.suppliers = null;
+  go('home'); toast('Sesión cerrada', 'info');
+}
+
+// Ventanita simple (pedir dato o confirmar)
+function modal(html, buttons) {
+  return new Promise(resolve => {
+    const bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    bg.innerHTML = `<div class="modal-box" role="dialog" aria-modal="true">${html}<div class="flex gap-2 mt-5">${buttons.map((b, i) => `<button data-i="${i}" class="${b.cls || 'btn-primary'}" style="padding:.7rem 1rem">${b.text}</button>`).join('')}</div></div>`;
+    document.body.appendChild(bg);
+    const inp = bg.querySelector('input'); if (inp) setTimeout(() => inp.focus(), 30);
+    bg.addEventListener('click', e => {
+      const t = e.target.closest('[data-i]');
+      if (t) { const v = inp ? inp.value : true; bg.remove(); resolve(buttons[+t.dataset.i].ok ? v : null); }
+      else if (e.target === bg) { bg.remove(); resolve(null); }
+    });
+  });
+}
+
+async function forgot() {
+  const c = ($('#lCuit') || {}).value || '';
+  const msg = 'Hola VentiunGo, olvidé mi contraseña de RedPro. Mi CUIT es: ' + (c.trim() || '(completar)') + '. ¿Me ayudan a cambiarla?';
+  const ok = await modal(`<h3 class="text-lg font-black text-gray-900 mb-2">¿Olvidaste tu contraseña?</h3><p class="text-sm text-gray-600">Escribinos por WhatsApp con tu CUIT y te damos una contraseña nueva.</p>`,
+    [{ text: 'Cancelar', cls: 'btn-secondary' }, { text: 'Escribir por WhatsApp', ok: true }]);
+  if (ok) window.open('https://wa.me/' + WA_SUPPORT + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// Soporte: dar una contraseña nueva a un usuario (crea una credencial nueva y la asocia al CUIT)
+async function supportReset(cuit) {
+  const m = (S.admin || []).find(x => x.cuit === cuit); if (!m) return;
+  const pass = await modal(`<h3 class="text-lg font-black text-gray-900 mb-1">Nueva contraseña</h3><p class="text-sm text-gray-500 mb-3">${esc(m.name)} · ${esc(fmtCuit(cuit))}</p><input class="form-input" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">`,
+    [{ text: 'Cancelar', cls: 'btn-secondary' }, { text: 'Guardar', ok: true }]);
+  if (pass == null) return;
+  if (pass.length < 6) return toast('La contraseña debe tener al menos 6 caracteres', 'error');
+  try {
+    const sa = secAuth();
+    const authEmail = cuit + '.rst' + Date.now().toString(36) + '@' + AUTH_DOMAIN;
+    const cred = await sa.createUserWithEmailAndPassword(authEmail, pass);
+    const uid = cred.user.uid;
+    await sa.signOut();
+    const b = DB.batch();
+    b.update(DB.collection(COL).doc(cuit), { uid });
+    b.set(DB.collection(LOGIN).doc(cuit), { authEmail, uid });
+    await b.commit();
+    m.uid = uid;
+    const wa = waNumber(m.phone);
+    const text = `Hola ${m.name}, te dejamos tu nueva contraseña de RedPro: ${pass}\nIngresá con tu CUIT ${fmtCuit(cuit)}. Después podés cambiarla desde "Editar perfil".`;
+    await modal(`<h3 class="text-lg font-black text-gray-900 mb-2">Contraseña cambiada</h3><p class="text-sm text-gray-600">${esc(m.name)} ya puede entrar con su CUIT y la contraseña nueva.</p>`,
+      [{ text: 'Listo', cls: 'btn-secondary' }].concat(wa.length >= 12 ? [{ text: 'Avisarle por WhatsApp', ok: true }] : []))
+      .then(v => { if (v) window.open('https://wa.me/' + wa + '?text=' + encodeURIComponent(text), '_blank'); });
+  } catch (e) { toast(errMsg(e), 'error'); }
+}
+async function supportDelete(cuit) {
+  const m = (S.admin || []).find(x => x.cuit === cuit); if (!m) return;
+  const ok = await modal(`<h3 class="text-lg font-black text-gray-900 mb-2">¿Eliminar la cuenta?</h3><p class="text-sm text-gray-600">Se borra <b>${esc(m.name)}</b> (${esc(fmtCuit(cuit))}) de RedPro. No se puede deshacer.</p>`,
+    [{ text: 'Cancelar', cls: 'btn-secondary' }, { text: 'Eliminar', ok: true, cls: 'btn-primary' }]);
+  if (!ok) return;
+  try {
+    const b = DB.batch();
+    b.delete(DB.collection(COL).doc(cuit)); b.delete(DB.collection(LOGIN).doc(cuit));
+    await b.commit();
+    S.admin = S.admin.filter(x => x.cuit !== cuit); render();
+    toast(`${m.name} eliminado correctamente`);
+  } catch (e) { toast('Error al eliminar', 'error'); }
+}
+async function supportPlan(cuit) {
+  const m = (S.admin || []).find(x => x.cuit === cuit); if (!m) return;
+  const plan = m.plan === 'destacado' ? 'basico' : 'destacado';
+  try { await DB.collection(COL).doc(cuit).update({ plan }); m.plan = plan; render(); toast(`${m.name}: plan ${plan === 'destacado' ? 'Destacado' : 'Básico'}`); }
+  catch (e) { toast(errMsg(e), 'error'); }
+}
+
+// ====================== Eventos ======================
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-go],[data-act],[data-role],[data-plan],[data-tab],[data-del],[data-reset],[data-plan-toggle]');
+  if (!t) return;
+  if (t.dataset.go) {
+    const v = t.dataset.go;
+    if (v === 'editProfile') { const u = S.user; S.form = { name: u.name, phone: u.phone, email: u.email || '', category: u.category || '', plan: u.plan, password: '' }; S.logo = u.logo || null; }
+    if (v === 'role' || v === 'login') S.busy = false;
+    return go(v);
+  }
+  if (t.dataset.role) { S.role = t.dataset.role; S.step = 1; S.logo = null; S.form = { cuit: '', name: '', phone: '', category: '', password: '', email: '', plan: 'basico' }; return go('register'); }
+  if (t.dataset.plan) {
+    if (S.view === 'register' && S.step === 2) S.form.email = $('#fEmail').value;
+    if (S.view === 'editProfile') { S.form.name = $('#eName').value; S.form.phone = $('#ePhone').value; S.form.email = $('#eEmail').value; if ($('#eCat')) S.form.category = $('#eCat').value; S.form.password = $('#ePass').value; }
+    S.form.plan = t.dataset.plan; return render();
+  }
+  if (t.dataset.tab) { S.adminTab = t.dataset.tab; return render(); }
+  if (t.dataset.del) return supportDelete(t.dataset.del);
+  if (t.dataset.reset) return supportReset(t.dataset.reset);
+  if (t.dataset.planToggle) return supportPlan(t.dataset.planToggle);
+  const a = t.dataset.act;
+  if (a === 'back') {
+    if (S.view === 'register') { if (S.step === 2) { S.form.email = $('#fEmail').value; S.step = 1; return render(); } return go('role'); }
+    if (S.view === 'editProfile') return go(S.user.role === 'comerciante' ? 'merchant' : 'supplier');
+    return go('home');
+  }
+  if (a === 'next') { readStep1(); if (validStep1()) { S.step = 2; render(); } return; }
+  if (a === 'register') return register();
+  if (a === 'saveProfile') return saveProfile();
+  if (a === 'logout') return logout();
+  if (a === 'forgot') return forgot();
+  if (a === 'pickLogo') { const i = $('#logoInput'); if (i) i.click(); return; }
+  if (a === 'terms' || a === 'privacy') {
+    return modal(a === 'terms'
+      ? `<h3 class="text-lg font-black text-gray-900 mb-2">Términos y Condiciones</h3><p class="text-sm text-gray-600">RedPro es un directorio que conecta comerciantes y proveedores dentro de la República Argentina. Cada usuario es responsable de los datos que publica y de los acuerdos que realice con otros usuarios. El plan Destacado tiene un costo mensual de $10.000.</p>`
+      : `<h3 class="text-lg font-black text-gray-900 mb-2">Política de Privacidad</h3><p class="text-sm text-gray-600">Usamos tus datos (CUIT, nombre del negocio, teléfono, email y logo) solo para el funcionamiento de RedPro. Los datos de los proveedores se muestran a los comerciantes registrados. Podés pedir la baja de tu cuenta escribiendo a soporte.</p>`,
+      [{ text: 'Cerrar', ok: true }]);
+  }
+});
+document.addEventListener('change', async e => {
+  if (e.target.id === 'logoInput') {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (S.view === 'register' && S.step === 1) readStep1();
+    if (S.view === 'editProfile') { S.form.name = $('#eName').value; S.form.phone = $('#ePhone').value; S.form.email = $('#eEmail').value; if ($('#eCat')) S.form.category = $('#eCat').value; S.form.password = $('#ePass').value; }
+    try { S.logo = await readLogo(file); render(); }
+    catch (err) { toast(err.message === 'peso' ? 'La imagen debe ser menor a 500KB' : 'No se pudo leer la imagen', 'error'); }
+  }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'search') {
+    S.search = e.target.value;
+    const pos = e.target.selectionStart;
+    render();
+    const s = $('#search'); s.focus(); try { s.setSelectionRange(pos, pos); } catch (x) {}
+  }
+  if (e.target.id === 'ePass') { const w = $('#eOldWrap'); if (w) w.hidden = !e.target.value; }
+});
+document.addEventListener('submit', e => {
+  if (e.target.id === 'loginForm') { e.preventDefault(); login($('#lCuit').value, $('#lPass').value); }
+});
+window.addEventListener('hashchange', () => {
+  if (location.hash === '#app') {
+    S.inApp = true;
+    if (S.view === 'home' && S.soporte) return openAdmin();
+    if (S.view === 'home' && S.user) return enter(S.user);
+    render(); window.scrollTo(0, 0);
+  } else if (!location.hash) { S.inApp = false; S.view = 'home'; render(); window.scrollTo(0, 0); }
+});
+
+// ====================== Inicio ======================
+S.inApp = location.hash === '#app';
+render();
+if (fb()) {
+  let first = true;
+  AUTH.onAuthStateChanged(async u => {
+    if (!first) return; first = false;
+    if (!u) return;
+    // Sesión guardada: al entrar a la app va directo a su panel
+    try {
+      if (isSupportUser(u)) { S.soporte = true; if (S.inApp && S.view === 'home') openAdmin(); return; }
+      const user = await loadProfile(u.uid);
+      if (!user) return;
+      S.user = user;
+      if (S.inApp && S.view === 'home') enter(user);
+    } catch (e) {}
+  });
+}
+})();
+</script>
+<script>
+// ===== Ojo para ver la contraseña que se escribe =====
+(function () {
+    var OPEN = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+    var SHUT = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+    function addEye(inp) {
+        if (inp.dataset.eye) return;
+        inp.dataset.eye = '1';
+        var cs = getComputedStyle(inp);
+        var wrap = document.createElement('span');
+        wrap.style.position = 'relative';
+        wrap.style.display = cs.display === 'inline' ? 'inline-block' : 'block';
+        wrap.style.margin = cs.margin;
+        if (cs.width && /swal2-input/.test(inp.className)) { wrap.style.width = cs.width; wrap.style.marginLeft = 'auto'; wrap.style.marginRight = 'auto'; }
+        inp.parentNode.insertBefore(wrap, inp);
+        wrap.appendChild(inp);
+        inp.style.margin = '0';
+        if (/swal2-input/.test(inp.className)) inp.style.width = '100%';
+        inp.style.paddingRight = '44px';
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.setAttribute('aria-label', 'Mostrar contraseña');
+        b.title = 'Mostrar contraseña';
+        b.innerHTML = OPEN;
+        b.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;padding:6px;cursor:pointer;color:#6b7280;line-height:0;display:flex;align-items:center;justify-content:center';
+        b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+        b.addEventListener('click', function (e) {
+            e.preventDefault(); e.stopPropagation();
+            var show = inp.type === 'password';
+            inp.type = show ? 'text' : 'password';
+            b.innerHTML = show ? SHUT : OPEN;
+            b.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            b.title = b.getAttribute('aria-label');
+            inp.focus();
+        });
+        wrap.appendChild(b);
+    }
+    function scan(root) {
+        var list = (root || document).querySelectorAll ? (root || document).querySelectorAll('input[type="password"]:not([data-eye])') : [];
+        for (var i = 0; i < list.length; i++) addEye(list[i]);
+    }
+    function start() {
+        scan(document);
+        new MutationObserver(function () { scan(document); }).observe(document.body, { childList: true, subtree: true });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>
+</script>
+<script>
+// ===== Instalar como app en el celular =====
+var __installPrompt = null;
+function appInstalada() {
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+}
+function installBtnHtml() {
+  if (appInstalada()) return '';
+  return '<button onclick="instalarApp()" class="install-btn" title="Instalar app en el celular" aria-label="Instalar app">⬇ Instalar</button>';
+}
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); __installPrompt = e; });
+function avisoInstalar(html) {
+  var bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = '<div class="modal-box" role="dialog" aria-modal="true"><h3 class="text-lg font-black text-gray-900 mb-3">Instalar RedPro</h3>' + html + '<button class="btn-primary mt-5">Entendido</button></div>';
+  bg.addEventListener('click', function (e) { if (e.target === bg || e.target.tagName === 'BUTTON') bg.remove(); });
+  document.body.appendChild(bg);
+}
+window.addEventListener('appinstalled', function () {
+  __installPrompt = null;
+  avisoInstalar('<p class="text-sm text-gray-600">¡Listo! Ya tenés RedPro en la pantalla de inicio de tu celular.</p>');
+});
+function instalarApp() {
+  if (__installPrompt) {
+    __installPrompt.prompt();
+    __installPrompt.userChoice.finally(function () { __installPrompt = null; });
+    return;
+  }
+  var ua = navigator.userAgent || '';
+  var ios = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  avisoInstalar(ios
+    ? '<ol class="text-sm text-gray-700 list-decimal pl-5 space-y-1"><li>Abrí esta página en <b>Safari</b>.</li><li>Tocá el botón <b>Compartir</b> (el cuadrado con la flecha hacia arriba).</li><li>Elegí <b>Agregar a pantalla de inicio</b>.</li><li>Tocá <b>Agregar</b>.</li></ol>'
+    : '<ol class="text-sm text-gray-700 list-decimal pl-5 space-y-1"><li>Abrí esta página en <b>Chrome</b>.</li><li>Tocá los <b>tres puntitos ⋮</b> arriba a la derecha.</li><li>Elegí <b>Instalar app</b> o <b>Agregar a pantalla principal</b>.</li><li>Confirmá con <b>Instalar</b>.</li></ol>');
+}
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
+</body>
+</html>

@@ -109,6 +109,356 @@ body{margin:0;font-family:"Plus Jakarta Sans",Inter,system-ui,sans-serif;-webkit
 <div class="toast-container" id="toasts" aria-live="polite"></div>
 
 <script>
+/* ===== VentiunGo · Suscripciones: 2 meses gratis y los mismos planes que ventiungo.ar ===== */
+window.VGSubs = (function () {
+  var DAY = 864e5, TRIAL_DAYS = 60, WA_DEF = '5493415628884';
+  // Igual que la sección "Planes y precios" de ventiungo.ar (los precios y descuentos se pueden cambiar desde soporte)
+  var DEF = {
+    moneda: 'ARS',
+    periodos: [{ id: 'mes', nombre: 'Mensual', meses: 1, desc: 0 }, { id: 'tri', nombre: 'Trimestral', meses: 3, desc: 10 }, { id: 'anio', nombre: 'Anual', meses: 12, desc: 25 }],
+    funciones: ['Soporte especializado', 'Registro de ventas', 'Registro de gastos', 'Registro de inventarios', 'Módulo de estadísticas',
+      'Descarga de comprobantes', 'Descarga de reportes', 'Gestión de clientes', 'Gestión de proveedores', 'Variación de productos', 'Control de deudas',
+      'Creación de recetas', 'Uso desde el celular', 'Uso desde la computadora', 'Documento electrónico'],
+    planes: [
+      { id: 'esencial', nombre: 'Esencial (App)', icono: '📱', base: 15600, recomendado: false, cinta: '', no: ['Creación de recetas', 'Uso desde la computadora', 'Documento electrónico'] },
+      { id: 'pro', nombre: 'Pro (App + Web)', icono: '💻', base: 31200, recomendado: true, cinta: 'Recomendado para emprendedores', no: ['Documento electrónico'] }
+    ]
+  };
+  var APPS = { peluquerias: 'VentiunGo Peluquerías', sociocafe: 'Socios Café', flordelceibo: 'Flor del Ceibo', redpro: 'RedPro' };
+  var cur = null, cfg = null, cfgP = null, blockEl = null, pillEl = null, periodo = 'anio', elegido = '';
+
+  function h(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function amt(n, mon) { var d = mon === 'ARS' ? 0 : 2; return (Math.round((Number(n) || 0) * (d ? 100 : 1)) / (d ? 100 : 1)).toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+  function perMes(mon) { return mon === 'ARS' ? '/mes' : mon + '/mes'; }
+  function fdate(ms) { return ms ? new Date(ms).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'; }
+  function tms(v) { if (!v) return 0; if (typeof v === 'number') return v; if (v.toMillis) return v.toMillis(); if (v.seconds) return v.seconds * 1000; var d = Date.parse(v); return isNaN(d) ? 0 : d; }
+  function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (_) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
+  function addMonths(ms, m) { var d = new Date(ms); var day = d.getDate(); d.setMonth(d.getMonth() + m); if (d.getDate() < day) d.setDate(0); return d.getTime(); }
+  function ts(ms) { return firebase.firestore.Timestamp.fromMillis(ms); }
+
+  // Planes vigentes: los de la web + lo que soporte haya cambiado en config/planes
+  function cat() {
+    var c = cfg || {};
+    return {
+      moneda: c.moneda || DEF.moneda,
+      periodos: DEF.periodos.map(function (p) { var o = (c.periodos || {})[p.id] || {}; return Object.assign({}, p, { desc: o.desc != null && o.desc !== '' ? Number(o.desc) : p.desc }); }),
+      planes: DEF.planes.map(function (p) { var o = (c.planes || {})[p.id] || {}; return Object.assign({}, p, { base: o.base != null && o.base !== '' ? Number(o.base) : p.base }); }),
+      funciones: DEF.funciones,
+      links: c.links || {}
+    };
+  }
+  function planLabel(key) {
+    var k = String(key || '').split('_'), c = cat();
+    var pl = c.planes.filter(function (x) { return x.id === k[0]; })[0], pe = c.periodos.filter(function (x) { return x.id === k[1]; })[0];
+    return pl ? pl.nombre + (pe ? ' · ' + pe.nombre : '') : String(key || '');
+  }
+
+  function css() {
+    if (document.getElementById('vgs-css')) return;
+    var s = document.createElement('style'); s.id = 'vgs-css';
+    s.textContent = [
+      '.vgs-ov{position:fixed;inset:0;z-index:2147483000;background:rgba(42,39,48,.62);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 16px;font:15px/1.5 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;color-scheme:light}',
+      '.vgs-card{--bg:#fff;--soft:#F5F2F9;--line:#E5E0EC;--ink:#2A2730;--muted:#6B6575;--accent:#CDB8E8;--accent-strong:#9C7FD0;--dark:#2A2730;background:var(--bg);color:var(--ink);border-radius:22px;max-width:900px;width:100%;margin:auto;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.35)}',
+      '.vgs-card h2{margin:0 0 4px;font-size:24px;line-height:1.2;letter-spacing:-.01em}.vgs-card p{margin:0}.vgs-mut{color:var(--muted);font-size:14px}',
+      '.vgs-eyebrow{display:inline-block;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-strong);margin-bottom:6px}',
+      '.vgs-alert{background:var(--soft);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:18px;font-size:14px}',
+      '.vgs-center{text-align:center}',
+      '.vgs-billing{display:flex;width:max-content;max-width:100%;margin:18px auto 22px;padding:5px;gap:4px;background:var(--soft);border:1px solid var(--line);border-radius:14px}',
+      '.vgs-billing button{font:inherit;font-size:15px;font-weight:600;border:0;background:none;color:var(--muted);padding:9px 16px;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap}',
+      '.vgs-billing button.on{background:var(--dark);color:#fff}.vgs-billing .off{font-size:12px;font-weight:800;padding:2px 7px;border-radius:6px;background:#2E8B57;color:#fff}',
+      '.vgs-plans{display:grid;grid-template-columns:repeat(2,minmax(0,400px));justify-content:center;gap:22px;align-items:start}',
+      '.vgs-p2{background:#fff;border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 4px 18px rgba(42,39,48,.07)}',
+      '.vgs-p2.rec{border:2px solid var(--accent-strong);box-shadow:0 10px 30px rgba(42,39,48,.10)}',
+      '.vgs-p2 .ribbon{background:var(--accent);text-align:center;font-size:13px;font-weight:700;padding:8px}',
+      '.vgs-p2 .in{padding:24px 24px 26px}',
+      '.vgs-p2 h3{margin:0;font-size:20px;display:flex;align-items:center;justify-content:center;gap:10px}',
+      '.vgs-p2 .was{text-align:center;color:var(--muted);text-decoration:line-through;font-size:15px;margin-top:14px;min-height:22px}',
+      '.vgs-p2 .now{text-align:center;font-size:38px;font-weight:800;letter-spacing:-.02em;line-height:1.1}',
+      '.vgs-p2 .now small{font-size:15px;font-weight:600;color:var(--muted);letter-spacing:0}',
+      '.vgs-p2 .tot{text-align:center;font-size:13px;color:var(--muted);min-height:20px;margin-top:4px}',
+      '.vgs-p2 ul{list-style:none;padding:18px 0 0;margin:18px 0 22px;border-top:1px solid var(--line);display:grid;gap:9px;font-size:14.5px}',
+      '.vgs-p2 li{display:flex;gap:10px;align-items:center}',
+      '.vgs-p2 li::before{content:"✓";flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;background:#E3F1EA;color:#2E8B57}',
+      '.vgs-p2 li.no{color:var(--muted)}.vgs-p2 li.no::before{content:"✕";background:#FBE4E4;color:#C0392B}',
+      '.vgs-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border-radius:12px;font:inherit;font-weight:700;font-size:15px;text-decoration:none;cursor:pointer;border:1.5px solid var(--dark);background:var(--dark);color:#fff;transition:transform .15s,box-shadow .15s}',
+      '.vgs-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(42,39,48,.15)}',
+      '.vgs-btn.accent{background:var(--accent);border-color:var(--accent);color:var(--ink)}.vgs-btn.light{background:#fff;color:var(--ink)}',
+      '.vgs-btn.wide{width:100%}.vgs-btn.sm{padding:7px 12px;font-size:13.5px}',
+      '.vgs-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.vgs-sep{border:0;border-top:1px solid var(--line);margin:18px 0}',
+      '.vgs-in{border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:14px;background:#fff;color:var(--ink);min-width:0}',
+      '.vgs-kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px;margin:12px 0}.vgs-kv span:nth-child(odd){color:var(--muted)}',
+      '.vgs-badge{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:99px}.vgs-b-prueba{background:#dbeafe;color:#1d4ed8}.vgs-b-activo{background:#d1fae5;color:#047857}.vgs-b-vencido{background:#ffe4e6;color:#be123c}.vgs-b-nuevo{background:#f1f5f9;color:#475569}',
+      '.vgs-pill{position:fixed;left:50%;transform:translateX(-50%);bottom:max(14px,env(safe-area-inset-bottom));z-index:9990;background:#2A2730;color:#fff;border:0;border-radius:99px;padding:9px 16px;font:600 13px/1.2 system-ui,-apple-system,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.3);cursor:pointer;max-width:calc(100vw - 32px)}',
+      '.vgs-pill b{color:#CDB8E8}',
+      '.vgs-x{float:right;background:none;border:0;font-size:24px;line-height:1;color:var(--muted);cursor:pointer;padding:0 0 0 8px}',
+      '.vgs-msg{font-size:13.5px;margin-top:10px;min-height:1em}.vgs-msg.err{color:#C0392B}.vgs-msg.ok{color:#2E8B57}',
+      '.vgs-tbl{width:100%;border-collapse:collapse;font-size:13px}.vgs-tbl td,.vgs-tbl th{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}',
+      '@media (max-width:760px){.vgs-plans{grid-template-columns:minmax(0,460px)}.vgs-card{padding:20px 16px}}',
+      '@media (max-width:480px){.vgs-billing button{padding:8px 10px;font-size:14px}.vgs-billing .off{display:none}.vgs-p2 .now{font-size:32px}}'
+    ].join('\n');
+    document.head.appendChild(s);
+  }
+  function modal(inner, opt) {
+    css(); opt = opt || {};
+    var ov = document.createElement('div'); ov.className = 'vgs-ov';
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+    ov.innerHTML = '<div class="vgs-card">' + inner + '</div>';
+    if (!opt.blocking) ov.addEventListener('click', function (ev) { if (ev.target === ov || ev.target.closest('[data-vgs-close]')) close(); });
+    document.body.appendChild(ov);
+    function close() { if (ov.parentNode) ov.parentNode.removeChild(ov); if (opt.onClose) opt.onClose(); }
+    return { el: ov, close: close, set: function (html) { ov.querySelector('.vgs-card').innerHTML = html; } };
+  }
+
+  // ---------- estado ----------
+  function compute(d) {
+    d = d || {};
+    var start = tms(d.trialStart) || Date.now();
+    var trialEnd = start + (TRIAL_DAYS + (Number(d.trialExtra) || 0)) * DAY;
+    var paid = tms(d.paidUntil), now = Date.now();
+    var state = paid > now ? 'activo' : trialEnd > now ? 'prueba' : 'vencido';
+    var end = state === 'activo' ? paid : trialEnd;
+    return { state: state, trialStart: start, trialEnd: trialEnd, paidUntil: paid, plan: d.plan || '', days: Math.max(0, Math.ceil((end - now) / DAY)), end: end, pagos: d.pagos || [] };
+  }
+  function plain(d) { var o = {}; for (var k in d) { if (k === 'pagos') continue; var v = d[k]; o[k] = (v && (v.toMillis || v.seconds)) ? tms(v) : v; } return o; }
+  function loadCfg(db, force) {
+    if (cfg && !force) return Promise.resolve(cfg);
+    if (cfgP && !force) return cfgP;
+    cfgP = db.collection('config').doc('planes').get().then(function (sn) { cfg = sn.exists ? sn.data() : {}; cfgP = null; return cfg; }, function () { cfgP = null; cfg = cfg || {}; return cfg; });
+    return cfgP;
+  }
+  function waNum() { return String((cfg && cfg.whatsapp) || WA_DEF).replace(/\D/g, ''); }
+  function wa(text) { window.open('https://wa.me/' + waNum() + '?text=' + encodeURIComponent(text), '_blank'); }
+
+  // ---------- ventana de planes (igual a ventiungo.ar) ----------
+  function plansHTML(o, st, blocking) {
+    var c = cat(), p = c.periodos.filter(function (x) { return x.id === periodo; })[0] || c.periodos[2];
+    var aviso = blocking
+      ? '<div class="vgs-alert"><b>Terminó tu prueba gratis de 2 meses.</b> Para seguir usando ' + h(APPS[o.app]) + ' en <b>' + h(o.nombre) + '</b>, elegí un plan. Tus datos quedan guardados y la cuenta se habilita apenas se acredita el pago.</div>'
+      : (st && st.state === 'prueba' ? '<div class="vgs-alert">🎁 Te quedan <b>' + st.days + ' día' + (st.days === 1 ? '' : 's') + '</b> de prueba gratis (hasta el ' + fdate(st.trialEnd) + ').</div>'
+        : st && st.state === 'activo' ? '<div class="vgs-alert">✅ Tu plan' + (st.plan ? ' <b>' + h(planLabel(st.plan)) + '</b>' : '') + ' está activo hasta el <b>' + fdate(st.paidUntil) + '</b>. Podés renovarlo cuando quieras.</div>' : '');
+    var tabs = c.periodos.map(function (x) {
+      return '<button type="button" role="tab" data-vgs-per="' + x.id + '" class="' + (x.id === p.id ? 'on' : '') + '" aria-selected="' + (x.id === p.id) + '">' + h(x.nombre) + (x.desc ? '<span class="off">-' + x.desc + '%</span>' : '') + '</button>';
+    }).join('');
+    var cards = c.planes.map(function (pl) {
+      var mes = pl.base * (1 - p.desc / 100);
+      return '<article class="vgs-p2' + (pl.recomendado ? ' rec' : '') + '">' + (pl.cinta ? '<div class="ribbon">' + h(pl.cinta) + '</div>' : '') +
+        '<div class="in"><h3><span>' + pl.icono + '</span>' + h(pl.nombre) + '</h3>' +
+        '<div class="was">' + (p.desc ? '$ ' + amt(pl.base, c.moneda) + ' ' + h(perMes(c.moneda)) : '') + '</div>' +
+        '<div class="now">$ ' + amt(mes, c.moneda) + ' <small>' + h(perMes(c.moneda)) + '</small></div>' +
+        '<div class="tot">' + (p.meses > 1 ? 'Total a pagar por ' + (p.meses === 12 ? 'año' : 'trimestre') + ': $ ' + amt(mes * p.meses, c.moneda) : 'Se cobra mes a mes') + '</div>' +
+        '<ul>' + c.funciones.map(function (f) { return pl.no.indexOf(f) >= 0 ? '<li class="no">No incluye ' + h(f.charAt(0).toLowerCase() + f.slice(1)) + '</li>' : '<li>' + h(f) + '</li>'; }).join('') + '</ul>' +
+        '<button class="vgs-btn wide ' + (pl.recomendado ? 'accent' : '') + '" data-vgs-pay="' + pl.id + '">' + (c.links[pl.id + '_' + p.id] ? '💳 Pagar ' + h(p.nombre.toLowerCase()) : 'Elegir plan') + '</button></div></article>';
+    }).join('');
+    return (blocking ? '' : '<button class="vgs-x" data-vgs-close aria-label="Cerrar">×</button>') + aviso +
+      '<div class="vgs-center"><span class="vgs-eyebrow">Planes y precios</span><h2>Elegí el plan para tu negocio</h2><p class="vgs-mut" style="font-size:16px">Pagá por mes, por trimestre o por año y ahorrá.</p></div>' +
+      '<div class="vgs-billing" role="tablist">' + tabs + '</div><div class="vgs-plans">' + cards + '</div>' +
+      '<p class="vgs-mut vgs-center" style="margin-top:16px">Pagás con <b>Mercado Pago</b>: tarjeta de crédito, débito o dinero en cuenta.</p>' +
+      '<hr class="vgs-sep"><div class="vgs-row" style="justify-content:center">' +
+      (o.sid ? '<button class="vgs-btn light sm" data-vgs-paid>✅ Ya pagué: avisar por WhatsApp</button>' : '') +
+      (blocking ? '<button class="vgs-btn light sm" data-vgs-recheck>↻ Ya me activaron</button><button class="vgs-btn light sm" data-vgs-logout>Cerrar sesión</button>' : '<button class="vgs-btn light sm" data-vgs-close>Cerrar</button>') +
+      '</div><p class="vgs-msg vgs-center" data-vgs-msg></p>';
+  }
+  function bindPlans(m, o, st, blocking) {
+    var el = m.el;
+    el.querySelectorAll('[data-vgs-per]').forEach(function (b) {
+      b.onclick = function () { periodo = b.getAttribute('data-vgs-per'); m.set(plansHTML(o, st, blocking)); bindPlans(m, o, st, blocking); };
+    });
+    el.querySelectorAll('[data-vgs-pay]').forEach(function (b) {
+      b.onclick = function () {
+        var key = b.getAttribute('data-vgs-pay') + '_' + periodo, link = cat().links[key];
+        elegido = key;
+        if (link && /^https?:\/\//.test(link)) {
+          window.open(link, '_blank');
+          var msg = el.querySelector('[data-vgs-msg]'); if (msg) { msg.className = 'vgs-msg ok vgs-center'; msg.textContent = 'Cuando termines de pagar, tocá "Ya pagué" para avisarnos y activamos tu cuenta.'; }
+        } else wa('Hola VentiunGo, quiero el plan ' + planLabel(key) + ' de ' + APPS[o.app] + (o.nombre ? ' para ' + o.nombre : '') + '. ¿Me pasan el link de pago?');
+      };
+    });
+    var pd = el.querySelector('[data-vgs-paid]'); if (pd) pd.onclick = function () { wa('Hola VentiunGo, ya pagué la suscripción de ' + APPS[o.app] + ' para ' + o.nombre + (elegido ? ' (plan ' + planLabel(elegido) + ')' : '') + '. Código: ' + o.sid + '. ¿Me activan la cuenta? Te mando el comprobante.'); };
+    var rc = el.querySelector('[data-vgs-recheck]'); if (rc) rc.onclick = function () {
+      var msg = el.querySelector('[data-vgs-msg]'); if (msg) { msg.className = 'vgs-msg vgs-center'; msg.textContent = 'Revisando…'; }
+      o.db.collection('suscripciones').doc(o.sid).get().then(function (sn) { if (sn.exists) onData(sn.data()); if (cur && cur.st && cur.st.state === 'vencido' && msg) { msg.className = 'vgs-msg err vgs-center'; msg.textContent = 'Todavía no figura el pago. Si ya pagaste, avisanos por WhatsApp.'; } }, function () { if (msg) { msg.className = 'vgs-msg err vgs-center'; msg.textContent = 'No se pudo revisar. Probá de nuevo.'; } });
+    };
+    var lo = el.querySelector('[data-vgs-logout]'); if (lo) lo.onclick = function () { hideBlock(); if (o.onLogout) o.onLogout(); };
+  }
+  function showPlans(o, st, blocking) {
+    o = o || (cur && cur.opts); if (!o) return;
+    st = st || (cur && cur.st);
+    if (blocking && blockEl && document.body.contains(blockEl.el)) return;
+    periodo = 'anio';
+    var m = modal(plansHTML(o, st, blocking), { blocking: blocking });
+    if (blocking) { blockEl = m; document.documentElement.style.overflow = 'hidden'; }
+    bindPlans(m, o, st, blocking);
+    if (!cfg) loadCfg(o.db).then(function () { if (m.el.parentNode) { m.set(plansHTML(o, st, blocking)); bindPlans(m, o, st, blocking); } });
+    return m;
+  }
+  function hideBlock() { if (blockEl) { blockEl.close(); blockEl = null; document.documentElement.style.overflow = ''; } }
+  function pill(st) {
+    if (pillEl && pillEl.parentNode) pillEl.parentNode.removeChild(pillEl);
+    pillEl = null;
+    if (!st || st.state !== 'prueba' || st.days > 15) return;
+    css();
+    pillEl = document.createElement('button'); pillEl.type = 'button'; pillEl.className = 'vgs-pill';
+    pillEl.innerHTML = '🎁 Prueba gratis: quedan <b>' + st.days + ' día' + (st.days === 1 ? '' : 's') + '</b> · Ver planes';
+    pillEl.onclick = function () { showPlans(cur && cur.opts, cur && cur.st, false); };
+    document.body.appendChild(pillEl);
+  }
+  function apply() {
+    if (!cur || !cur.st) return;
+    if (cur.st.state === 'vencido') { pill(null); showPlans(cur.opts, cur.st, true); }
+    else { hideBlock(); pill(cur.st); }
+  }
+  function onData(d) {
+    if (!cur) return;
+    var p = plain(d); lsSet('vgs:' + cur.sid, p);
+    cur.st = compute(p); apply();
+  }
+
+  // Revisa la suscripción del local abierto (la crea la primera vez: ese día empieza la prueba gratis)
+  function guard(o) {
+    if (!o || !o.db || !o.sid) return;
+    if (cur && cur.sid === o.sid) { cur.opts = o; apply(); return; }
+    stop();
+    var my = cur = { sid: o.sid, opts: o, st: null, unsub: null };
+    var cached = lsGet('vgs:' + o.sid); if (cached) { my.st = compute(cached); apply(); }
+    var ref = o.db.collection('suscripciones').doc(o.sid);
+    loadCfg(o.db);
+    ref.get().then(function (sn) {
+      if (my !== cur) return;
+      if (sn.exists) return onData(sn.data());
+      return ref.set({ app: o.app, ref: o.sid, nombre: String(o.nombre || '').slice(0, 80), trialStart: firebase.firestore.FieldValue.serverTimestamp() })
+        .catch(function () {
+          // Sin permiso para crearla: la prueba se cuenta desde el primer día que se abrió en este dispositivo
+          var f = lsGet('vgs:first:' + o.sid) || Date.now(); lsSet('vgs:first:' + o.sid, f);
+          if (my === cur && !cached) onData({ trialStart: f });
+        });
+    }, function () {}).then(function () {
+      if (my !== cur) return;
+      try { my.unsub = ref.onSnapshot(function (sn) { if (sn.exists && my === cur) onData(sn.data()); }, function () {}); } catch (_) {}
+    });
+    var iv = setInterval(function () { if (my !== cur) return clearInterval(iv); if (my.st) { var c = lsGet('vgs:' + my.sid); if (c) { my.st = compute(c); apply(); } } }, 30 * 60 * 1000);
+  }
+  function stop() {
+    if (cur && cur.unsub) { try { cur.unsub(); } catch (_) {} }
+    cur = null; hideBlock(); pill(null);
+  }
+
+  // ---------- soporte ----------
+  function badge(d) {
+    css();
+    if (!d) return '<span class="vgs-badge vgs-b-nuevo">Sin abrir</span>';
+    var st = compute(d);
+    if (st.state === 'activo') return '<span class="vgs-badge vgs-b-activo">Pagó hasta ' + fdate(st.paidUntil) + '</span>';
+    if (st.state === 'prueba') return '<span class="vgs-badge vgs-b-prueba">Prueba · ' + st.days + ' días</span>';
+    return '<span class="vgs-badge vgs-b-vencido">Vencido ' + fdate(st.trialEnd > st.paidUntil ? st.trialEnd : st.paidUntil) + '</span>';
+  }
+  function listAll(db, app) {
+    var q = db.collection('suscripciones'); if (app) q = q.where('app', '==', app);
+    return q.get().then(function (qs) { var m = {}; qs.forEach(function (d) { m[d.id] = d.data(); }); return m; });
+  }
+  function admin(o) {
+    css();
+    var ref = o.db.collection('suscripciones').doc(o.sid), data = null, m = null, selPlan = 'pro';
+    function render(msg, ok) {
+      var c = cat(), st = data ? compute(data) : null;
+      if (st && st.plan && st.plan.indexOf('_') > 0) selPlan = st.plan.split('_')[0];
+      var pagos = (data && data.pagos || []).slice(-6).reverse();
+      var html = '<button class="vgs-x" data-vgs-close aria-label="Cerrar">×</button><h2>💳 Suscripción</h2><p class="vgs-mut">' + h(o.nombre) + ' · ' + h(APPS[o.app]) + '</p>' +
+        (st ? '<div class="vgs-kv"><span>Estado</span><span>' + badge(data) + '</span><span>Empezó la prueba</span><span>' + fdate(st.trialStart) + '</span><span>Fin de la prueba</span><span>' + fdate(st.trialEnd) + (Number(data.trialExtra) ? ' (+' + Number(data.trialExtra) + ' días extra)' : '') + '</span><span>Pagó hasta</span><span>' + (st.paidUntil ? fdate(st.paidUntil) + (st.plan ? ' · ' + h(planLabel(st.plan)) : '') : '—') + '</span></div>'
+          : '<p class="vgs-mut" style="margin:12px 0">Todavía no abrió la app con esta versión: la prueba gratis de 2 meses empieza la primera vez que entre. Igual podés registrar un pago.</p>') +
+        '<p style="font-weight:700;margin:6px 0">Registrar pago (se suma desde el vencimiento o desde hoy)</p>' +
+        '<div class="vgs-row"><select class="vgs-in" id="vgs-plan">' + c.planes.map(function (p) { return '<option value="' + p.id + '"' + (p.id === selPlan ? ' selected' : '') + '>' + h(p.nombre) + '</option>'; }).join('') + '</select>' +
+        c.periodos.map(function (p) { return '<button class="vgs-btn sm" data-vgs-add="' + p.id + '">+ ' + h(p.nombre) + '</button>'; }).join('') + '</div>' +
+        '<div class="vgs-row" style="margin-top:10px"><label class="vgs-mut" for="vgs-until">Pagó hasta</label><input id="vgs-until" type="date" class="vgs-in" value="' + (st && st.paidUntil ? new Date(st.paidUntil - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10) : '') + '"><button class="vgs-btn sm light" data-vgs-setdate>Guardar fecha</button></div>' +
+        '<div class="vgs-row" style="margin-top:10px"><button class="vgs-btn sm light" data-vgs-trial>+15 días de prueba</button>' + (st && st.paidUntil ? '<button class="vgs-btn sm light" data-vgs-unpay>Quitar pago</button>' : '') + '<button class="vgs-btn sm light" data-vgs-cfg>Precios y links de pago</button></div>' +
+        (pagos.length ? '<hr class="vgs-sep"><p style="font-weight:700;margin-bottom:6px">Últimos pagos registrados</p><table class="vgs-tbl"><tr><th>Fecha</th><th>Plan</th><th>Hasta</th></tr>' + pagos.map(function (x) { return '<tr><td>' + fdate(x.fecha) + '</td><td>' + h(x.plan === 'manual' ? 'Fecha manual' : planLabel(x.plan)) + '</td><td>' + fdate(x.hasta) + '</td></tr>'; }).join('') + '</table>' : '') +
+        '<p class="vgs-msg ' + (ok ? 'ok' : msg ? 'err' : '') + '">' + h(msg || '') + '</p>';
+      if (!m) m = modal(html); else m.set(html);
+      bind();
+    }
+    function base() { return { app: o.app, ref: o.sid, nombre: String(o.nombre || '').slice(0, 80) }; }
+    function save(patch, okMsg) {
+      var p = Object.assign(base(), patch);
+      if (!data || !data.trialStart) p.trialStart = firebase.firestore.FieldValue.serverTimestamp();
+      return ref.set(p, { merge: true }).then(function () { return ref.get(); }).then(function (sn) { data = sn.exists ? sn.data() : null; render(okMsg, true); if (o.onChange) o.onChange(); },
+        function (e) { render(/permission/.test((e && e.code) || '') ? 'Sin permiso: entrá con la cuenta de soporte.' : 'No se pudo guardar. Revisá la conexión.'); });
+    }
+    function bind() {
+      var el = m.el, sp = el.querySelector('#vgs-plan');
+      if (sp) sp.onchange = function () { selPlan = sp.value; };
+      el.querySelectorAll('[data-vgs-add]').forEach(function (b) {
+        b.onclick = function () {
+          var pe = cat().periodos.filter(function (x) { return x.id === b.getAttribute('data-vgs-add'); })[0];
+          var key = selPlan + '_' + pe.id;
+          var from = Math.max(Date.now(), data ? tms(data.paidUntil) : 0);
+          var until = addMonths(from, pe.meses);
+          if (!confirm('¿Registrar pago del plan ' + planLabel(key) + '? Queda activo hasta el ' + fdate(until) + '.')) return;
+          save({ paidUntil: ts(until), plan: key, pagos: firebase.firestore.FieldValue.arrayUnion({ fecha: Date.now(), plan: key, hasta: until }) }, 'Listo: activo hasta el ' + fdate(until) + '.');
+        };
+      });
+      var sd = el.querySelector('[data-vgs-setdate]'); if (sd) sd.onclick = function () {
+        var v = el.querySelector('#vgs-until').value; if (!v) return render('Elegí una fecha.');
+        var p = v.split('-'), until = new Date(+p[0], +p[1] - 1, +p[2], 23, 59).getTime();
+        save({ paidUntil: ts(until), pagos: firebase.firestore.FieldValue.arrayUnion({ fecha: Date.now(), plan: 'manual', hasta: until }) }, 'Listo: activo hasta el ' + fdate(until) + '.');
+      };
+      var tr = el.querySelector('[data-vgs-trial]'); if (tr) tr.onclick = function () { save({ trialExtra: (Number(data && data.trialExtra) || 0) + 15 }, 'Se sumaron 15 días de prueba.'); };
+      var up = el.querySelector('[data-vgs-unpay]'); if (up) up.onclick = function () { if (confirm('¿Quitar el pago? La cuenta vuelve al estado de la prueba (o vencida).')) save({ paidUntil: firebase.firestore.FieldValue.delete(), plan: firebase.firestore.FieldValue.delete() }, 'Pago quitado.'); };
+      var cf = el.querySelector('[data-vgs-cfg]'); if (cf) cf.onclick = function () { plansEditor(o.db); };
+    }
+    render('Cargando…', true);
+    Promise.all([ref.get(), loadCfg(o.db)]).then(function (r) { data = r[0].exists ? r[0].data() : null; render(); }, function () { render('No se pudo leer la suscripción.'); });
+  }
+  function plansEditor(db) {
+    css();
+    var m = modal('<p class="vgs-mut">Cargando…</p>');
+    loadCfg(db, true).then(function () {
+      var c = cat();
+      var rows = c.planes.map(function (pl) {
+        return '<div class="vgs-row" style="margin-bottom:8px"><b style="width:150px;font-size:14px">' + pl.icono + ' ' + h(pl.nombre) + '</b><label class="vgs-mut">Precio por mes</label>' +
+          '<input class="vgs-in" type="number" min="0" step="any" inputmode="decimal" style="width:120px" data-vgs-base="' + pl.id + '" value="' + pl.base + '"></div>';
+      }).join('') + '<div class="vgs-row" style="margin:6px 0 4px">' + c.periodos.map(function (p) {
+        return '<label class="vgs-mut">' + h(p.nombre) + ' −</label><input class="vgs-in" type="number" min="0" max="90" step="1" style="width:64px" data-vgs-desc="' + p.id + '" value="' + p.desc + '"' + (p.id === 'mes' ? ' disabled' : '') + '><span class="vgs-mut" style="margin-right:10px">%</span>';
+      }).join('') + '</div>';
+      var links = c.planes.map(function (pl) {
+        return c.periodos.map(function (p) {
+          var k = pl.id + '_' + p.id;
+          return '<div class="vgs-row" style="margin-bottom:6px"><b style="width:210px;font-size:13px">' + h(pl.nombre) + ' · ' + h(p.nombre) + '</b>' +
+            '<input class="vgs-in" type="url" placeholder="https://mpago.la/..." style="flex:1;min-width:200px" data-vgs-ln="' + k + '" value="' + h(c.links[k] || '') + '"></div>';
+        }).join('');
+      }).join('');
+      m.set('<button class="vgs-x" data-vgs-close aria-label="Cerrar">×</button><h2>Precios y links de pago</h2>' +
+        '<p class="vgs-mut">Estos precios se muestran iguales en <b>ventiungo.ar</b> y en las ventanas de planes de las apps.</p>' +
+        '<p style="font-weight:800;margin:16px 0 8px">Precios</p><div class="vgs-row" style="margin-bottom:8px"><label class="vgs-mut" for="vgs-mon">Moneda</label><input id="vgs-mon" class="vgs-in" style="width:80px" value="' + h(c.moneda) + '"></div>' + rows +
+        '<p style="font-weight:800;margin:18px 0 6px">Links de pago de Mercado Pago</p><p class="vgs-mut" style="margin-bottom:10px">En Mercado Pago: <b>Cobrar → Link de pago</b>. Creá uno por plan y período con el total a cobrar (aceptan tarjeta de crédito, débito y dinero en cuenta). Si un link queda vacío, el botón le pide el link a tu WhatsApp.</p>' + links +
+        '<div class="vgs-row" style="margin-top:12px"><b style="width:210px;font-size:13px">WhatsApp de cobros</b><input class="vgs-in" type="tel" placeholder="5493415628884" style="width:200px" data-vgs-wa value="' + h((cfg && cfg.whatsapp) || WA_DEF) + '"></div>' +
+        '<hr class="vgs-sep"><div class="vgs-row"><button class="vgs-btn" data-vgs-save>Guardar</button><button class="vgs-btn light" data-vgs-close>Cancelar</button></div><p class="vgs-msg" data-vgs-msg></p>');
+      m.el.querySelector('[data-vgs-save]').onclick = function () {
+        var msg = m.el.querySelector('[data-vgs-msg]'), bad = '', planes = {}, periodos = {}, lk = {};
+        m.el.querySelectorAll('[data-vgs-base]').forEach(function (i) { var v = Number(i.value); if (!(v > 0)) bad = 'Revisá los precios: tienen que ser mayores a 0.'; planes[i.getAttribute('data-vgs-base')] = { base: Math.round(v * 100) / 100 }; });
+        m.el.querySelectorAll('[data-vgs-desc]').forEach(function (i) { var v = Math.round(Number(i.value) || 0); if (v < 0 || v > 90) bad = 'Los descuentos tienen que estar entre 0 y 90%.'; periodos[i.getAttribute('data-vgs-desc')] = { desc: i.disabled ? 0 : v }; });
+        m.el.querySelectorAll('[data-vgs-ln]').forEach(function (i) { var v = i.value.trim(); if (v && !/^https:\/\/\S+$/.test(v)) bad = 'Los links tienen que empezar con https://'; lk[i.getAttribute('data-vgs-ln')] = v; });
+        var mon = (m.el.querySelector('#vgs-mon').value || 'ARS').trim().toUpperCase().slice(0, 5);
+        var w = m.el.querySelector('[data-vgs-wa]').value.replace(/\D/g, '');
+        if (w && (w.length < 10 || w.length > 15)) bad = 'El WhatsApp tiene que tener entre 10 y 15 números, con código de país.';
+        if (bad) { msg.className = 'vgs-msg err'; msg.textContent = bad; return; }
+        msg.className = 'vgs-msg'; msg.textContent = 'Guardando…';
+        var data = { moneda: mon, planes: planes, periodos: periodos, links: lk, whatsapp: w || WA_DEF, updatedAt: Date.now() };
+        db.collection('config').doc('planes').set(data).then(function () {
+          cfg = data; msg.className = 'vgs-msg ok'; msg.textContent = 'Guardado. Ya se ve igual en ventiungo.ar y en las apps.';
+        }, function (e) { msg.className = 'vgs-msg err'; msg.textContent = /permission/.test((e && e.code) || '') ? 'Sin permiso: entrá con la cuenta de soporte.' : 'No se pudo guardar.'; });
+      };
+    });
+  }
+
+  // Ver los planes sin cuenta (página de inicio): solo precios y links de pago
+  function showCatalog(o) { showPlans({ db: o.db, app: o.app, nombre: '', sid: '' }, null, false); }
+
+  return { guard: guard, stop: stop, showCatalog: showCatalog, showPlans: function () { if (cur) showPlans(cur.opts, cur.st, false); }, current: function () { return cur && cur.sid; }, state: function () { return cur && cur.st; },
+    admin: admin, plansEditor: plansEditor, badge: badge, listAll: listAll, compute: compute, TRIAL_DAYS: TRIAL_DAYS };
+})();
+
+</script>
+<script>
 (function () {
 'use strict';
 // ====================== Datos fijos ======================
@@ -235,8 +585,8 @@ function header(opts) {
 
 // ====================== Página de inicio (landing) ======================
 function landing() {
-  const steps = [['01', '📝', 'Registrate', 'Creá tu cuenta como comerciante o proveedor en menos de 2 minutos.'], ['02', '🎯', 'Elegí tu plan', 'Empezá gratis con el plan Básico o potenciá tu visibilidad con Destacado.'], ['03', '🔍', 'Explorá', 'Buscá y filtrá proveedores por categoría, plan y ubicación.'], ['04', '🤝', 'Conectate', 'Contactá directamente con proveedores y hacé crecer tu negocio.']];
-  const bens = [['bg-verde-pro', '🚀', 'Acceso inmediato', 'Conectate con cientos de proveedores verificados al instante. Sin intermediarios, sin demoras.'], ['bg-amarillo-pro', '💎', 'Proveedores destacados', 'Los proveedores con plan Destacado tienen mayor visibilidad y acceso exclusivo a más comerciantes.'], ['bg-verde-pro', '🔒', 'Seguro y confiable', 'Verificamos el CUIT de cada usuario para garantizar que todos los contactos sean negocios reales.']];
+  const steps = [['01', '📝', 'Registrate', 'Creá tu cuenta como comerciante o proveedor en menos de 2 minutos.'], ['02', '🎁', 'Probalo gratis', 'Tenés 2 meses gratis. Después elegís el plan Esencial o Pro.'], ['03', '🔍', 'Explorá', 'Buscá y filtrá proveedores por categoría y ubicación.'], ['04', '🤝', 'Conectate', 'Contactá directamente con proveedores y hacé crecer tu negocio.']];
+  const bens = [['bg-verde-pro', '🚀', 'Acceso inmediato', 'Conectate con cientos de proveedores verificados al instante. Sin intermediarios, sin demoras.'], ['bg-amarillo-pro', '💎', 'Todos los proveedores', 'Cada comerciante ve el directorio completo de proveedores, sin niveles ni filtros ocultos.'], ['bg-verde-pro', '🔒', 'Seguro y confiable', 'Verificamos el CUIT de cada usuario para garantizar que todos los contactos sean negocios reales.']];
   const li = (c, t) => `<li class="flex items-center gap-3 text-gray-700"><span class="${c} text-lg">${c === 'text-verde-pro' ? '✓' : '★'}</span> ${t}</li>`;
   return `<div class="min-h-screen bg-white">
   <header class="bg-verde-pro text-white sticky top-0 z-50" style="padding-top:env(safe-area-inset-top)"><div class="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
@@ -273,13 +623,13 @@ function landing() {
     <div><div class="text-amarillo-pro font-bold text-sm uppercase tracking-widest mb-4">Nuestra Visión</div><h3 class="text-3xl font-black mb-4">La mayor red de abastecimiento del país</h3><p class="text-green-200 leading-relaxed text-lg">Ser la plataforma de referencia que transforme la cadena de abastecimiento en Argentina, conectando a miles de comerciantes y proveedores en un ecosistema digital transparente y accesible.</p></div>
   </div></div></section>
   <section class="py-24 px-4 bg-gray-50"><div class="max-w-3xl mx-auto">
-    <div class="text-center mb-16"><p class="text-verde-pro font-semibold text-sm uppercase tracking-widest mb-3">Planes</p><h2 class="text-4xl font-black text-gray-900 mb-4">Precios simples y transparentes</h2><p class="text-gray-600 text-lg">Comenzá gratis, crecé cuando quieras.</p></div>
+    <div class="text-center mb-16"><p class="text-verde-pro font-semibold text-sm uppercase tracking-widest mb-3">Planes</p><h2 class="text-4xl font-black text-gray-900 mb-4">2 meses gratis, después elegís tu plan</h2><p class="text-gray-600 text-lg">Los mismos planes de todas las apps de VentiunGo: Esencial y Pro, por mes, por trimestre o por año.</p></div>
     <div class="grid md:grid-cols-2 gap-8">
-      <div class="landing-card p-8 border-2 border-gray-100"><div class="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-2">Plan Básico</div><div class="text-5xl font-black text-gray-900 mb-1">Gratis</div><div class="text-gray-500 text-sm mb-6">Para siempre</div><ul class="space-y-3 mb-8">${['Perfil visible en el directorio', 'Contacto directo con comerciantes', 'Acceso a proveedores básicos', 'Soporte por email'].map(t => li('text-verde-pro', t)).join('')}</ul><a href="#app" class="block text-center bg-verde-pro text-white font-bold py-3 px-6 rounded-xl hover:bg-verde-light transition-colors">Comenzar gratis</a></div>
-      <div class="landing-card p-8 border-2 border-amarillo-pro relative overflow-hidden"><div class="absolute top-4 right-4 bg-amarillo-pro text-verde-pro text-xs font-black px-3 py-1 rounded-full uppercase">Popular</div><div class="text-amarillo-pro text-sm font-semibold uppercase tracking-wide mb-2">Plan Destacado</div><div class="text-5xl font-black text-gray-900 mb-1">$10.000</div><div class="text-gray-500 text-sm mb-6">por mes</div><ul class="space-y-3 mb-8">${['Todo el plan Básico', 'Aparecés primero en búsquedas', 'Visibilidad ante todos los comerciantes', 'Insignia Destacado en tu perfil', 'Soporte prioritario'].map(t => li('text-amarillo-pro', t)).join('')}</ul><a href="#app" class="block text-center bg-amarillo-pro text-verde-pro font-bold py-3 px-6 rounded-xl hover:bg-yellow-300 transition-colors">Elegir Destacado</a></div>
+      <div class="landing-card p-8 border-2 border-gray-100"><div class="text-gray-500 text-sm font-semibold uppercase tracking-wide mb-2">Prueba gratis</div><div class="text-5xl font-black text-gray-900 mb-1">2 meses</div><div class="text-gray-500 text-sm mb-6">para comerciantes y proveedores</div><ul class="space-y-3 mb-8">${['Perfil visible en el directorio', 'Contacto directo por WhatsApp', 'Todos los proveedores', 'Sin tarjeta para empezar'].map(t => li('text-verde-pro', t)).join('')}</ul><a href="#app" class="block text-center bg-verde-pro text-white font-bold py-3 px-6 rounded-xl hover:bg-verde-light transition-colors">Empezar gratis</a></div>
+      <div class="landing-card p-8 border-2 border-amarillo-pro relative overflow-hidden"><div class="absolute top-4 right-4 bg-amarillo-pro text-verde-pro text-xs font-black px-3 py-1 rounded-full uppercase">Ahorrá 25%</div><div class="text-amarillo-pro text-sm font-semibold uppercase tracking-wide mb-2">Después de la prueba</div><div class="text-4xl font-black text-gray-900 mb-1">Esencial o Pro</div><div class="text-gray-500 text-sm mb-6">pago mensual, trimestral (−10%) o anual (−25%)</div><ul class="space-y-3 mb-8">${['Pagás con Mercado Pago', 'Tarjeta de crédito, débito o dinero en cuenta', 'Tus datos quedan guardados', 'Soporte especializado'].map(t => li('text-amarillo-pro', t)).join('')}</ul><button data-act="verPlanes" class="block w-full text-center bg-amarillo-pro text-verde-pro font-bold py-3 px-6 rounded-xl hover:bg-yellow-300 transition-colors border-none cursor-pointer">Ver planes y precios</button></div>
     </div>
   </div></section>
-  <section class="py-20 px-4 bg-verde-pro text-white text-center"><div class="max-w-2xl mx-auto"><h2 class="text-4xl font-black mb-4">¿Listo para conectar tu negocio?</h2><p class="text-green-200 text-lg mb-8">Únete a más de 1.700 negocios que ya usan RedPro.</p><a href="#app" class="inline-flex items-center gap-2 bg-amarillo-pro text-verde-pro font-bold px-10 py-4 rounded-2xl text-xl hover:bg-yellow-300 transition-colors shadow-xl">Registrate ahora — es gratis</a></div></section>
+  <section class="py-20 px-4 bg-verde-pro text-white text-center"><div class="max-w-2xl mx-auto"><h2 class="text-4xl font-black mb-4">¿Listo para conectar tu negocio?</h2><p class="text-green-200 text-lg mb-8">Únete a más de 1.700 negocios que ya usan RedPro.</p><a href="#app" class="inline-flex items-center gap-2 bg-amarillo-pro text-verde-pro font-bold px-10 py-4 rounded-2xl text-xl hover:bg-yellow-300 transition-colors shadow-xl">Probalo 2 meses gratis</a></div></section>
   <footer class="bg-gray-900 text-gray-400 py-12 px-4"><div class="max-w-5xl mx-auto">
     <div class="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">${brand()}<div class="flex gap-6 text-sm"><button data-act="terms" class="hover:text-white transition-colors cursor-pointer bg-transparent border-none text-gray-400">Términos y Condiciones</button><button data-act="privacy" class="hover:text-white transition-colors cursor-pointer bg-transparent border-none text-gray-400">Política de Privacidad</button></div></div>
     <div class="border-t border-gray-800 pt-8 text-center text-sm">© 2026 RedPro. Todos los derechos reservados. Plataforma para uso dentro de la República Argentina.<br><span class="text-gray-500">Una app de <a href="https://ventiungo.ar" class="hover:text-white">VentiunGo</a></span></div>
@@ -345,14 +695,14 @@ function vRegister() {
     </div>`;
   const step2 = `<div class="space-y-4">
       <div><label class="form-label" for="fEmail">Email *</label><input id="fEmail" class="form-input" type="email" placeholder="tu@email.com" value="${esc(f.email)}"></div>
-      <div><label class="form-label">Plan</label>${plans(f.plan)}</div>
+      <div class="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-gray-700">🎁 Tenés <b>2 meses gratis</b>. Después elegís el plan Esencial o Pro.</div>
       <button class="btn-primary mt-2" data-act="register" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Registrando...' : 'Completar registro'}</button>
     </div>`;
   return header({ back: 'regBack' }) + `<div class="app-container animate-fadeIn">
     <div class="flex items-center justify-center gap-2 mb-6 mt-2"><div class="step-dot ${S.step === 1 ? 'active' : 'done'}"></div><div class="step-dot ${S.step === 2 ? 'active' : ''}"></div></div>
     <div class="card-app">
       <h2 class="text-xl font-black text-gray-900 mb-1">${S.step === 1 ? 'Registro ' + who : 'Datos de acceso'}</h2>
-      <p class="text-gray-500 text-sm mb-5">${S.step === 1 ? 'Paso 1 de 2 — Datos principales' : 'Paso 2 de 2 — Email y plan'}</p>
+      <p class="text-gray-500 text-sm mb-5">${S.step === 1 ? 'Paso 1 de 2 — Datos principales' : 'Paso 2 de 2 — Email'}</p>
       ${S.step === 1 ? step1 : step2}
     </div>
     <p class="text-center text-sm text-gray-500 mt-4">¿Ya tenés cuenta? <button class="link-btn" data-go="login">Iniciá sesión</button></p>
@@ -379,13 +729,12 @@ function vMerchant() {
   if (!list) body = `<div class="text-center py-12 text-gray-400"><div class="text-3xl mb-2">⏳</div><p>Cargando proveedores...</p></div>`;
   else {
     const q = S.search.trim().toLowerCase();
-    list = list.filter(x => u.plan === 'destacado' || x.plan !== 'destacado')
-      .filter(x => !q || (x.name || '').toLowerCase().includes(q) || (x.category || '').toLowerCase().includes(q))
-      .sort((a, b) => (a.plan === 'destacado') === (b.plan === 'destacado') ? (a.name || '').localeCompare(b.name || '') : a.plan === 'destacado' ? -1 : 1);
+    list = list.filter(x => !q || (x.name || '').toLowerCase().includes(q) || (x.category || '').toLowerCase().includes(q))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     body = !list.length ? `<div class="text-center py-12 text-gray-400"><div class="text-3xl mb-2">🔍</div><p>No se encontraron proveedores</p></div>`
       : list.map(x => `<div class="supplier-card">${avatar(x)}
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap"><span class="font-semibold text-gray-900 truncate">${esc(x.name)}</span>${x.plan === 'destacado' ? badge('destacado') : ''}</div>
+            <div class="flex items-center gap-2 flex-wrap"><span class="font-semibold text-gray-900 truncate">${esc(x.name)}</span></div>
             <div class="text-sm text-gray-500 mt-0.5">${esc(x.category || 'Sin categoría')}</div>
             <div class="text-xs text-gray-400 mt-0.5 flex flex-wrap gap-x-3">
               <span>📞 ${esc(x.phone)}</span>${x.email ? `<a class="hover:underline" href="mailto:${esc(x.email)}">📧 ${esc(x.email)}</a>` : ''}
@@ -396,14 +745,13 @@ function vMerchant() {
   }
   return header({ title: 'Comerciante', logout: true }) + `<div class="app-container animate-fadeIn">
     <div class="flex items-center gap-3 mb-5">${avatar(u)}
-      <div class="min-w-0"><div class="font-bold text-gray-900 truncate">${esc(u.name)}</div><div class="text-sm text-gray-500">${badge(u.plan)}</div></div>
+      <div class="min-w-0"><div class="font-bold text-gray-900 truncate">${esc(u.name)}</div><button data-act="miPlan" class="text-sm text-verde-pro font-semibold bg-transparent border-none cursor-pointer p-0">💳 Mi plan</button></div>
       <button data-go="editProfile" class="ml-auto text-sm text-verde-pro font-medium bg-transparent border-none cursor-pointer">Editar</button>
     </div>
     <div class="relative mb-5">
       <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input id="search" class="search-input" placeholder="Buscar proveedores por nombre o categoría..." value="${esc(S.search)}" aria-label="Buscar proveedores">
     </div>
-    ${u.plan !== 'destacado' ? `<div class="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 flex items-start gap-2"><span class="text-lg">ℹ️</span><div><div class="text-sm font-semibold text-amber-800">Plan Básico</div><div class="text-xs text-amber-700">Solo ves proveedores con plan Básico. Actualizá a Destacado para ver todos.</div></div></div>` : ''}
     <div class="space-y-3" id="supList">${body}</div>
   </div>`;
 }
@@ -416,15 +764,13 @@ function vSupplier() {
   return header({ title: 'Proveedor', logout: true }) + `<div class="app-container animate-fadeIn">
     <div class="card-app mb-4">
       <div class="flex items-center gap-4 mb-4">${avatar(u, 'w-16 h-16 text-xl rounded-2xl')}
-        <div class="min-w-0"><div class="font-black text-xl text-gray-900 truncate">${esc(u.name)}</div><div class="mt-1">${badge(u.plan, true)}</div></div>
+        <div class="min-w-0"><div class="font-black text-xl text-gray-900 truncate">${esc(u.name)}</div><div class="mt-1"><button data-act="miPlan" class="text-sm text-verde-pro font-semibold bg-transparent border-none cursor-pointer p-0">💳 Mi plan</button></div></div>
       </div>
       <div class="space-y-2 border-t pt-4">
         ${row('🏷️', 'Categoría', u.category || 'No especificada')}${row('📞', 'Teléfono', u.phone)}${row('📧', 'Email', u.email || 'No especificado')}${row('🪪', 'CUIT', fmtCuit(u.cuit))}
       </div>
     </div>
-    ${u.plan !== 'destacado'
-      ? `<div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-2xl p-4 mb-4"><div class="flex items-center gap-2 mb-2"><span class="text-xl">🚀</span><div class="font-bold text-gray-900">Mejorá tu visibilidad</div></div><p class="text-sm text-gray-600 mb-3">Con el Plan Destacado aparecés primero en las búsquedas y llegan más comerciantes a tu perfil.</p><button data-go="editProfile" class="btn-yellow">Actualizar a Destacado — $10.000/mes</button></div>`
-      : `<div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-4 mb-4"><div class="flex items-center gap-2"><span class="text-xl">⭐</span><div><div class="font-bold text-gray-900">Plan Destacado activo</div><div class="text-sm text-gray-600">Tu perfil aparece primero en búsquedas</div></div></div></div>`}
+    <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-4 mb-4"><div class="flex items-center gap-2 mb-2"><span class="text-xl">👀</span><div class="font-bold text-gray-900">Tu perfil está visible</div></div><p class="text-sm text-gray-600 mb-3">Todos los comerciantes de RedPro ven tu perfil y te pueden escribir por WhatsApp.</p><button data-act="miPlan" class="btn-yellow">💳 Ver mi plan</button></div>
     <button class="btn-secondary" data-go="editProfile">✏️ Editar perfil</button>
   </div>`;
 }
@@ -437,7 +783,6 @@ function vEdit() {
     <div><label class="form-label" for="ePhone">Teléfono</label><input id="ePhone" class="form-input" type="tel" value="${esc(f.phone)}"></div>
     <div><label class="form-label" for="eEmail">Email</label><input id="eEmail" class="form-input" type="email" value="${esc(f.email)}"></div>
     ${u.role === 'proveedor' ? `<div><label class="form-label" for="eCat">Categoría</label><select id="eCat" class="form-input">${catOptions(f.category)}</select></div>` : ''}
-    <div><label class="form-label">Plan</label>${plans(f.plan, true)}</div>
     <div><label class="form-label" for="ePass">Nueva contraseña (opcional)</label><input id="ePass" class="form-input" type="password" autocomplete="new-password" placeholder="Dejá vacío para no cambiar" value="${esc(f.password)}"></div>
     <div id="eOldWrap" ${f.password ? '' : 'hidden'}><label class="form-label" for="eOld">Contraseña actual</label><input id="eOld" class="form-input" type="password" autocomplete="current-password" placeholder="Para confirmar el cambio"></div>
     <button class="btn-primary" data-act="saveProfile" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Guardando...' : 'Guardar cambios'}</button>
@@ -450,6 +795,7 @@ function vAdmin() {
   const list = S.adminTab === 'comerciantes' ? com : prov;
   return header({ title: 'Admin', logout: true }) + `<div class="app-container animate-fadeIn">
     <div class="text-center mb-4 mt-2"><div class="text-2xl font-black text-gray-900">Panel de Administración</div><div class="text-sm text-gray-500">Gestión de usuarios · Soporte VentiunGo</div></div>
+    <button class="btn-secondary mb-4" data-act="subPlans">💳 Precios y links de pago</button>
     <div class="grid grid-cols-2 gap-3 mb-5">
       <div class="card-app text-center" style="padding:1.25rem"><div class="text-3xl font-black text-verde-pro">${com.length}</div><div class="text-sm text-gray-500">Comerciantes</div></div>
       <div class="card-app text-center" style="padding:1.25rem"><div class="text-3xl font-black text-verde-pro">${prov.length}</div><div class="text-sm text-gray-500">Proveedores</div></div>
@@ -461,7 +807,7 @@ function vAdmin() {
     ${!A ? `<div class="text-center py-8 text-gray-400">Cargando...</div>`
       : !list.length ? `<div class="text-center py-8 text-gray-400"><div class="text-3xl mb-2">📭</div>No hay ${S.adminTab} registrados</div>`
       : `<div class="space-y-2">${list.map(m => `<div class="card-app flex items-center gap-3" style="padding:.75rem 1rem">${avatar(m, 'w-10 h-10 text-base')}
-          <div class="flex-1 min-w-0"><div class="font-semibold text-gray-900 text-sm truncate">${esc(m.name)}</div><div class="text-xs text-gray-500">${esc(fmtCuit(m.cuit))} · ${esc(m.phone || '')}</div><div class="mt-0.5 flex items-center gap-2">${badge(m.plan)}<button class="text-xs text-verde-pro font-semibold bg-transparent border-none cursor-pointer" data-plan-toggle="${esc(m.cuit)}">${m.plan === 'destacado' ? 'Pasar a Básico' : 'Pasar a Destacado'}</button></div></div>
+          <div class="flex-1 min-w-0"><div class="font-semibold text-gray-900 text-sm truncate">${esc(m.name)}</div><div class="text-xs text-gray-500">${esc(fmtCuit(m.cuit))} · ${esc(m.phone || '')}</div><div class="mt-0.5 flex items-center gap-2">${S.subs ? VGSubs.badge(S.subs['rp-' + m.cuit]) : ''}<button class="text-xs text-verde-pro font-semibold bg-transparent border-none cursor-pointer" data-act="subAdm" data-cuit="${esc(m.cuit)}">💳 Suscripción</button></div></div>
           <div class="flex flex-col items-end gap-1">
             <button class="text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg px-2 py-1 border-none cursor-pointer" data-reset="${esc(m.cuit)}">🔑 Clave</button>
             <button class="text-red-500 hover:text-red-700 text-sm font-medium bg-transparent border-none cursor-pointer px-1" title="Eliminar" aria-label="Eliminar ${esc(m.name)}" data-del="${esc(m.cuit)}">🗑️</button>
@@ -471,7 +817,16 @@ function vAdmin() {
 }
 
 // ====================== Render ======================
+// Suscripción: 2 meses gratis y después plan pago (soporte no se bloquea)
+function subsHook() {
+  if (!window.VGSubs || !DB) return;
+  if (S.user && !S.soporte && S.user.cuit) { const sid = 'rp-' + S.user.cuit; if (VGSubs.current() !== sid) VGSubs.guard({ db: DB, app: 'redpro', sid, nombre: S.user.name, onLogout: logout }); }
+  else if (VGSubs.current()) VGSubs.stop();
+}
+function loadSubs() { if (!S.soporte || !DB) return; VGSubs.listAll(DB, 'redpro').then(m => { S.subs = m; if (S.view === 'admin') render(); }, () => {}); }
 function render() {
+  subsHook();
+  if (S.soporte && S.view === 'admin' && !S.subsAsked) { S.subsAsked = true; setTimeout(loadSubs, 0); }
   const appMode = location.hash === '#app' || S.view !== 'home' || S.inApp;
   const root = $('#root');
   if (!appMode) { root.innerHTML = landing(); return; }
@@ -623,7 +978,8 @@ async function saveProfile() {
 
 async function logout() {
   try { if (AUTH) await AUTH.signOut(); } catch (e) {}
-  S.user = null; S.soporte = false; S.admin = null; S.suppliers = null;
+  S.user = null; S.soporte = false; S.admin = null; S.suppliers = null; S.subs = null; S.subsAsked = false;
+  if (window.VGSubs) VGSubs.stop();
   go('home'); toast('Sesión cerrada', 'info');
 }
 
@@ -727,11 +1083,15 @@ document.addEventListener('click', async e => {
   if (a === 'saveProfile') return saveProfile();
   if (a === 'logout') return logout();
   if (a === 'reload') return actualizarApp();
+  if (a === 'miPlan') return VGSubs.showPlans();
+  if (a === 'verPlanes') { if (fb()) VGSubs.showCatalog({ db: DB, app: 'redpro' }); return; }
+  if (a === 'subPlans') { if (S.soporte) VGSubs.plansEditor(DB); return; }
+  if (a === 'subAdm') { const m = (S.admin || []).find(x => x.cuit === t.dataset.cuit); if (m && S.soporte) VGSubs.admin({ db: DB, app: 'redpro', sid: 'rp-' + m.cuit, nombre: m.name, onChange: loadSubs }); return; }
   if (a === 'forgot') return forgot();
   if (a === 'pickLogo') { const i = $('#logoInput'); if (i) i.click(); return; }
   if (a === 'terms' || a === 'privacy') {
     return modal(a === 'terms'
-      ? `<h3 class="text-lg font-black text-gray-900 mb-2">Términos y Condiciones</h3><p class="text-sm text-gray-600">RedPro es un directorio que conecta comerciantes y proveedores dentro de la República Argentina. Cada usuario es responsable de los datos que publica y de los acuerdos que realice con otros usuarios. El plan Destacado tiene un costo mensual de $10.000.</p>`
+      ? `<h3 class="text-lg font-black text-gray-900 mb-2">Términos y Condiciones</h3><p class="text-sm text-gray-600">RedPro es un directorio que conecta comerciantes y proveedores dentro de la República Argentina. Cada usuario es responsable de los datos que publica y de los acuerdos que realice con otros usuarios. Los primeros 2 meses son gratis; después, el uso de RedPro requiere un plan pago (Esencial o Pro), que se abona por Mercado Pago.</p>`
       : `<h3 class="text-lg font-black text-gray-900 mb-2">Política de Privacidad</h3><p class="text-sm text-gray-600">Usamos tus datos (CUIT, nombre del negocio, teléfono, email y logo) solo para el funcionamiento de RedPro. Los datos de los proveedores se muestran a los comerciantes registrados. Podés pedir la baja de tu cuenta escribiendo a soporte.</p>`,
       [{ text: 'Cerrar', ok: true }]);
   }

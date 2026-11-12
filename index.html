@@ -270,7 +270,7 @@ window.VGSubs = (function () {
         elegido = key;
         if (link && /^https?:\/\//.test(link)) {
           window.open(link, '_blank');
-          var msg = el.querySelector('[data-vgs-msg]'); if (msg) { msg.className = 'vgs-msg ok vgs-center'; msg.textContent = 'Cuando termines de pagar, tocá "Ya pagué" para avisarnos y activamos tu cuenta.'; }
+          var msg = el.querySelector('[data-vgs-msg]'); if (msg) { msg.className = 'vgs-msg ok vgs-center'; msg.textContent = o.sid ? 'Cuando termines de pagar, tocá "Ya pagué" para avisarnos y activamos tu cuenta.' : 'Cuando termines de pagar, creá tu cuenta (o entrá con tu usuario) y avisanos por WhatsApp con el comprobante: activamos tu plan.'; }
         } else wa('Hola VentiunGo, quiero el plan ' + planLabel(key) + ' de ' + APPS[o.app] + (o.nombre ? ' para ' + o.nombre : '') + '. ¿Me pasan el link de pago?');
       };
     });

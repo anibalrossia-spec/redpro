@@ -999,12 +999,32 @@ function modal(html, buttons) {
   });
 }
 
+/* ¿Olvidaste tu contraseña? — mismo cartel en todas las apps de VentiunGo */
+function vgOlvideDialog(o){
+  o=o||{};var old=document.getElementById('vg-olvide');if(old)old.remove();
+  var m=(getComputedStyle(document.body).backgroundColor||'').match(/\d+/g)||[255,255,255],dark=(+m[0]+ +m[1]+ +m[2])<300;
+  var ov=document.createElement('div');ov.id='vg-olvide';ov.setAttribute('role','dialog');ov.setAttribute('aria-modal','true');
+  ov.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;font-family:inherit';
+  var b='border:0;border-radius:6px;padding:12px 20px;font-size:16px;line-height:1.2;font-weight:600;font-family:inherit;cursor:pointer;color:#fff';
+  ov.innerHTML='<div style="width:100%;max-width:420px;background:'+(dark?'#16191e':'#fff')+';color:'+(dark?'#e5e7eb':'#1f2937')+';border-radius:14px;padding:28px 22px 24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.35)">'+
+    '<div style="width:84px;height:84px;margin:0 auto 18px;border:4px solid '+(dark?'#c9dae1':'#c9dae1')+';border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:54px;line-height:1;font-weight:400;color:#87adbd">?</div>'+
+    '<h2 style="margin:0 0 12px;font-size:26px;line-height:1.2;font-weight:700">¿Olvidaste tu contraseña?</h2>'+
+    '<p style="margin:0 0 22px;font-size:16px;line-height:1.45">Escribile a <b>VentiunGo</b> por WhatsApp y te damos una <b>contraseña nueva</b>. Vas a poder entrar desde cualquier celular.</p>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">'+
+      '<button type="button" data-vgo="wa" style="'+b+';background:#10b981">💬 Escribir por WhatsApp</button>'+
+      (o.extra?'<button type="button" data-vgo="extra" style="'+b+';background:#0f172a">'+o.extra+'</button>':'')+
+      '<button type="button" data-vgo="close" style="'+b+';background:#6b7280">Cerrar</button></div></div>';
+  function close(){ov.remove()}
+  ov.addEventListener('click',function(e){
+    if(e.target===ov)return close();var t=e.target.closest('[data-vgo]');if(!t)return;var a=t.getAttribute('data-vgo');close();
+    if(a==='wa')window.open(o.wa,'_blank');else if(a==='extra'&&o.onExtra)o.onExtra();
+  });
+  document.body.appendChild(ov);
+}
 async function forgot() {
   const c = ($('#lCuit') || {}).value || '';
   const msg = 'Hola VentiunGo, olvidé mi contraseña de RedPro. Mi CUIT es: ' + (c.trim() || '(completar)') + '. ¿Me ayudan a cambiarla?';
-  const ok = await modal(`<h3 class="text-lg font-black text-gray-900 mb-2">¿Olvidaste tu contraseña?</h3><p class="text-sm text-gray-600">Escribinos por WhatsApp con tu CUIT y te damos una contraseña nueva.</p>`,
-    [{ text: 'Cancelar', cls: 'btn-secondary' }, { text: 'Escribir por WhatsApp', ok: true }]);
-  if (ok) window.open('https://wa.me/' + WA_SUPPORT + '?text=' + encodeURIComponent(msg), '_blank');
+  vgOlvideDialog({ wa: 'https://wa.me/' + WA_SUPPORT + '?text=' + encodeURIComponent(msg) });
 }
 
 // Soporte: dar una contraseña nueva a un usuario (crea una credencial nueva y la asocia al CUIT)

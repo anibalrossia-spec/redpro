@@ -158,6 +158,12 @@ window.VGSubs = (function () {
     if (document.getElementById('vgs-css')) return;
     var s = document.createElement('style'); s.id = 'vgs-css';
     s.textContent = [
+      '.vgs-trial{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;margin:12px 0;padding:16px 18px;background:#fff;color:#2A2730;border:1px solid #E5E0EC;border-radius:20px;box-shadow:0 6px 20px rgba(42,39,48,.08);font:15px/1.45 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:left;color-scheme:light}',
+      '.vgs-ring{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#9C7FD0 var(--p),#F0EBF6 0);position:relative}',
+      '.vgs-ring::before{content:"";position:absolute;inset:7px;border-radius:50%;background:#fff}',
+      '.vgs-ring b{position:relative;display:flex;flex-direction:column;align-items:center;font-size:24px;font-weight:800;line-height:1;color:#2A2730}.vgs-ring small{font-size:11px;font-weight:600;color:#6B6575;margin-top:2px}',
+      '.vgs-trial h3{margin:0 0 4px;font-size:17px;font-weight:800;line-height:1.25;color:#2A2730}.vgs-trial p{margin:0 0 10px;font-size:14px;color:#6B6575}',
+      '.vgs-trial button{border:0;border-radius:999px;padding:8px 16px;font:700 13.5px inherit;font-family:inherit;background:#2A2730;color:#fff;cursor:pointer}.vgs-trial button:hover{background:#9C7FD0}',
       '.vgs-ov{position:fixed;inset:0;z-index:2147483000;background:rgba(42,39,48,.62);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 16px;font:15px/1.5 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;color-scheme:light}',
       '.vgs-card{--bg:#fff;--soft:#F5F2F9;--line:#E5E0EC;--ink:#2A2730;--muted:#6B6575;--accent:#CDB8E8;--accent-strong:#9C7FD0;--dark:#2A2730;background:var(--bg);color:var(--ink);border-radius:22px;max-width:900px;width:100%;margin:auto;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.35)}',
       '.vgs-card h2{margin:0 0 4px;font-size:24px;line-height:1.2;letter-spacing:-.01em}.vgs-card p{margin:0}.vgs-mut{color:var(--muted);font-size:14px}',
@@ -303,10 +309,32 @@ window.VGSubs = (function () {
     pillEl.onclick = function () { showPlans(cur && cur.opts, cur && cur.st, false); };
     document.body.appendChild(pillEl);
   }
+  // Tarjeta de prueba gratis (igual que en Cartera): se dibuja en cada <div data-vgs-trial> de la app
+  var trialObs = null;
+  function trialHTML(st) {
+    var total = Math.max(1, Math.round((st.trialEnd - st.trialStart) / DAY)), pct = Math.max(0, Math.min(100, Math.round(st.days / total * 100)));
+    return '<div class="vgs-trial"><div class="vgs-ring" style="--p:' + pct + '%"><b>' + st.days + '<small>' + (st.days === 1 ? 'día' : 'días') + '</small></b></div>' +
+      '<div><h3>Prueba gratis de 2 meses</h3><p>Usá todo sin límites hasta el ' + fdate(st.trialEnd) + '. Después elegís el plan que te quede mejor.</p><button type="button" data-vgs-verplanes>Ver planes</button></div></div>';
+  }
+  function fillTrial() {
+    var st = cur && cur.st, html = st && st.state === 'prueba' ? trialHTML(st) : '';
+    if (html) css();
+    document.querySelectorAll('[data-vgs-trial]').forEach(function (el) {
+      if (el.getAttribute('data-vgs-k') === html) return;
+      el.setAttribute('data-vgs-k', html); el.innerHTML = html;
+      var b = el.querySelector('[data-vgs-verplanes]'); if (b) b.onclick = function (ev) { ev.preventDefault(); ev.stopPropagation(); showPlans(cur && cur.opts, cur && cur.st, false); };
+    });
+    if (!trialObs && window.MutationObserver && document.body) {
+      var pend = false;
+      trialObs = new MutationObserver(function () { if (pend) return; pend = true; setTimeout(function () { pend = false; fillTrial(); }, 0); });
+      trialObs.observe(document.body, { childList: true, subtree: true });
+    }
+  }
   function apply() {
     if (!cur || !cur.st) return;
     if (cur.st.state === 'vencido') { pill(null); showPlans(cur.opts, cur.st, true); }
     else { hideBlock(); pill(cur.st); }
+    fillTrial();
   }
   function onData(d) {
     if (!cur) return;
@@ -340,7 +368,7 @@ window.VGSubs = (function () {
   }
   function stop() {
     if (cur && cur.unsub) { try { cur.unsub(); } catch (_) {} }
-    cur = null; hideBlock(); pill(null);
+    cur = null; hideBlock(); pill(null); fillTrial();
   }
 
   // ---------- soporte ----------
@@ -743,7 +771,7 @@ function vMerchant() {
           ${waNumber(x.phone).length >= 12 ? `<a href="https://wa.me/${waNumber(x.phone)}?text=${encodeURIComponent('¡Hola ' + x.name + '! Te contacto desde RedPro: soy ' + u.name + ' y me interesa abastecerme con ustedes.')}" target="_blank" rel="noopener" class="shrink-0 bg-green-50 text-verde-pro font-bold text-xs px-3 py-2 rounded-xl hover:bg-green-100">WhatsApp</a>` : ''}
         </div>`).join('');
   }
-  return header({ title: 'Comerciante', logout: true }) + `<div class="app-container animate-fadeIn">
+  return header({ title: 'Comerciante', logout: true }) + `<div class="app-container animate-fadeIn"><div data-vgs-trial></div>
     <div class="flex items-center gap-3 mb-5">${avatar(u)}
       <div class="min-w-0"><div class="font-bold text-gray-900 truncate">${esc(u.name)}</div><button data-act="miPlan" class="text-sm text-verde-pro font-semibold bg-transparent border-none cursor-pointer p-0">💳 Mi plan</button></div>
       <button data-go="editProfile" class="ml-auto text-sm text-verde-pro font-medium bg-transparent border-none cursor-pointer">Editar</button>
@@ -761,7 +789,7 @@ function row(icon, label, value) {
 }
 function vSupplier() {
   const u = S.user;
-  return header({ title: 'Proveedor', logout: true }) + `<div class="app-container animate-fadeIn">
+  return header({ title: 'Proveedor', logout: true }) + `<div class="app-container animate-fadeIn"><div data-vgs-trial></div>
     <div class="card-app mb-4">
       <div class="flex items-center gap-4 mb-4">${avatar(u, 'w-16 h-16 text-xl rounded-2xl')}
         <div class="min-w-0"><div class="font-black text-xl text-gray-900 truncate">${esc(u.name)}</div><div class="mt-1"><button data-act="miPlan" class="text-sm text-verde-pro font-semibold bg-transparent border-none cursor-pointer p-0">💳 Mi plan</button></div></div>
@@ -793,7 +821,7 @@ function vAdmin() {
   const A = S.admin;
   const com = A ? A.filter(x => x.role === 'comerciante') : [], prov = A ? A.filter(x => x.role === 'proveedor') : [];
   const list = S.adminTab === 'comerciantes' ? com : prov;
-  return header({ title: 'Admin', logout: true }) + `<div class="app-container animate-fadeIn">
+  return header({ title: 'Admin', logout: true }) + `<div class="app-container animate-fadeIn"><div data-vgs-trial></div>
     <div class="text-center mb-4 mt-2"><div class="text-2xl font-black text-gray-900">Panel de Administración</div><div class="text-sm text-gray-500">Gestión de usuarios · Soporte VentiunGo</div></div>
     <button class="btn-secondary mb-4" data-act="subPlans">💳 Precios y links de pago</button>
     <div class="grid grid-cols-2 gap-3 mb-5">

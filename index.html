@@ -724,6 +724,7 @@ function vRegister() {
   const step2 = `<div class="space-y-4">
       <div><label class="form-label" for="fEmail">Email *</label><input id="fEmail" class="form-input" type="email" placeholder="tu@email.com" value="${esc(f.email)}"></div>
       <div class="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-gray-700">🎁 Tenés <b>2 meses gratis</b>. Después elegís el plan Esencial o Pro.</div>
+      <label class="flex items-start gap-2.5 text-sm text-gray-700 cursor-pointer"><input type="checkbox" id="fTerms" ${f.terms ? 'checked' : ''} class="mt-0.5 w-[18px] h-[18px] shrink-0"><span>Acepto los <a href="https://ventiungo.ar/terminos/" target="_blank" rel="noopener" style="text-decoration:underline;font-weight:700;color:inherit">Términos y Condiciones</a> y la <a href="https://ventiungo.ar/terminos/#privacidad" target="_blank" rel="noopener" style="text-decoration:underline;font-weight:700;color:inherit">Política de Privacidad</a> de VentiunGo.</span></label>
       <button class="btn-primary mt-2" data-act="register" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Registrando...' : 'Completar registro'}</button>
     </div>`;
   return header({ back: 'regBack' }) + `<div class="app-container animate-fadeIn">
@@ -905,6 +906,8 @@ async function register() {
   const f = S.form;
   f.email = $('#fEmail').value.trim();
   if (!f.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) return toast('Ingresá tu email', 'error');
+  f.terms = !!($('#fTerms') && $('#fTerms').checked);
+  if (!f.terms) return toast('Para registrarte tenés que aceptar los Términos y Condiciones', 'error');
   if (!fb()) return toast('Sin conexión con la base de datos', 'error');
   const cuit = cuitDigits(f.cuit);
   S.busy = true; render();
@@ -921,7 +924,7 @@ async function register() {
       } else throw e;
     }
     const uid = cred.user.uid;
-    const user = { cuit, uid, role: S.role, name: f.name, phone: f.phone, email: f.email, category: S.role === 'proveedor' ? f.category : '', plan: f.plan, logo: S.logo || null, creado: Date.now() };
+    const user = { cuit, uid, role: S.role, name: f.name, phone: f.phone, email: f.email, category: S.role === 'proveedor' ? f.category : '', plan: f.plan, logo: S.logo || null, creado: Date.now(), terminos: new Date().toISOString() };
     const b = DB.batch();
     b.set(DB.collection(COL).doc(cuit), user);
     b.set(DB.collection(LOGIN).doc(cuit), { authEmail, uid });
@@ -1139,8 +1142,8 @@ document.addEventListener('click', async e => {
   if (a === 'pickLogo') { const i = $('#logoInput'); if (i) i.click(); return; }
   if (a === 'terms' || a === 'privacy') {
     return modal(a === 'terms'
-      ? `<h3 class="text-lg font-black text-gray-900 mb-2">Términos y Condiciones</h3><p class="text-sm text-gray-600">RedPro es un directorio que conecta comerciantes y proveedores dentro de la República Argentina. Cada usuario es responsable de los datos que publica y de los acuerdos que realice con otros usuarios. Los primeros 2 meses son gratis; después, el uso de RedPro requiere un plan pago (Esencial o Pro), que se abona por Mercado Pago.</p>`
-      : `<h3 class="text-lg font-black text-gray-900 mb-2">Política de Privacidad</h3><p class="text-sm text-gray-600">Usamos tus datos (CUIT, nombre del negocio, teléfono, email y logo) solo para el funcionamiento de RedPro. Los datos de los proveedores se muestran a los comerciantes registrados. Podés pedir la baja de tu cuenta escribiendo a soporte.</p>`,
+      ? `<h3 class="text-lg font-black text-gray-900 mb-2">Términos y Condiciones</h3><p class="text-sm text-gray-600">RedPro es un directorio que conecta comerciantes y proveedores dentro de la República Argentina. Cada usuario es responsable de los datos que publica y de los acuerdos que realice con otros usuarios. Los primeros 2 meses son gratis; después, el uso de RedPro requiere un plan pago (Esencial o Pro), que se abona por Mercado Pago.</p><p class="text-sm mt-3"><a href="https://ventiungo.ar/terminos/" target="_blank" rel="noopener" class="font-bold underline">Leer los Términos y Condiciones completos</a></p>`
+      : `<h3 class="text-lg font-black text-gray-900 mb-2">Política de Privacidad</h3><p class="text-sm text-gray-600">Usamos tus datos (CUIT, nombre del negocio, teléfono, email y logo) solo para el funcionamiento de RedPro. Los datos de los proveedores se muestran a los comerciantes registrados. Podés pedir la baja de tu cuenta escribiendo a soporte.</p><p class="text-sm mt-3"><a href="https://ventiungo.ar/terminos/#privacidad" target="_blank" rel="noopener" class="font-bold underline">Leer la Política de Privacidad completa</a></p>`,
       [{ text: 'Cerrar', ok: true }]);
   }
 });

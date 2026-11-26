@@ -125,6 +125,19 @@ window.VGSubs = (function () {
     ]
   };
   var APPS = { peluquerias: 'VentiunGo Peluquerías', sociocafe: 'Socios Café', flordelceibo: 'Flor del Ceibo', redpro: 'RedPro' };
+  // Qué incluye cada plan en cada app. Las marcadas con 1 son solo del plan Pro (durante la prueba gratis se usa todo).
+  var FEAT = {
+    peluquerias: [['Soporte especializado'], ['Agenda de turnos online'], ['Página para tus clientes'], ['Registro de ventas y gastos'], ['Registro de inventarios'], ['Gestión de clientes y socios'], ['Comprobantes para imprimir'], ['Uso desde el celular'],
+      ['Módulo de estadísticas', 1], ['Descarga de reportes en Excel', 1], ['Uso desde la computadora', 1]],
+    sociocafe: [['Soporte especializado'], ['Registro de ventas y canjes'], ['Gestión de socios y abonos'], ['Tarjeta digital para tus socios'], ['Comprobantes para imprimir'], ['Uso desde el celular'],
+      ['Módulo de estadísticas', 1], ['Descarga de reportes en Excel', 1], ['Uso desde la computadora', 1]],
+    flordelceibo: [['Soporte especializado'], ['Tienda online con catálogo'], ['Pedidos por WhatsApp y Mercado Pago'], ['Registro de ventas'], ['Control de stock'], ['Gestión de clientes'], ['Uso desde el celular'],
+      ['Uso desde la computadora', 1]],
+    redpro: [['Soporte especializado'], ['Perfil de tu negocio en el directorio'], ['Búsqueda de proveedores por rubro'], ['Contacto directo por WhatsApp'], ['Uso desde el celular'],
+      ['Uso desde la computadora', 1]]
+  };
+  function feats(app) { return FEAT[app] || FEAT.peluquerias; }
+  function soloPro(app) { return feats(app).filter(function (f) { return f[1]; }).map(function (f) { return f[0]; }); }
   var cur = null, cfg = null, cfgP = null, blockEl = null, pillEl = null, periodo = 'anio', elegido = '';
 
   function h(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -158,6 +171,10 @@ window.VGSubs = (function () {
     if (document.getElementById('vgs-css')) return;
     var s = document.createElement('style'); s.id = 'vgs-css';
     s.textContent = [
+      '.vgs-lock{position:absolute;inset:0;z-index:6;display:grid;place-items:center;padding:16px;background:rgba(255,255,255,.7);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);border-radius:inherit;font:15px/1.45 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#2A2730;text-align:center}',
+      '.vgs-lock>div{background:#fff;border:1px solid #E5E0EC;border-radius:18px;padding:18px 20px;max-width:340px;box-shadow:0 10px 30px rgba(42,39,48,.14)}.vgs-lock b{display:block;font-size:16px;margin-bottom:4px}.vgs-lock p{margin:0 0 12px;font-size:14px;color:#6B6575}',
+      '.vgs-lockcard{margin:12px 0;padding:26px 20px;text-align:center;background:#fff;color:#2A2730;border:1px dashed #CDB8E8;border-radius:20px;font:15px/1.45 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}.vgs-lockcard b{display:block;font-size:17px;margin-bottom:4px}.vgs-lockcard p{margin:0 auto 14px;max-width:420px;font-size:14px;color:#6B6575}',
+      '.vgs-lockcard button,.vgs-lock button{border:0;border-radius:999px;padding:9px 18px;font:700 14px inherit;font-family:inherit;background:#2A2730;color:#fff;cursor:pointer}.vgs-lockcard button:hover,.vgs-lock button:hover{background:#9C7FD0}',
       '.vgs-trial{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;margin:12px 0;padding:16px 18px;background:#fff;color:#2A2730;border:1px solid #E5E0EC;border-radius:20px;box-shadow:0 6px 20px rgba(42,39,48,.08);font:15px/1.45 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:left;color-scheme:light}',
       '.vgs-ring{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#9C7FD0 var(--p),#F0EBF6 0);position:relative}',
       '.vgs-ring::before{content:"";position:absolute;inset:7px;border-radius:50%;background:#fff}',
@@ -253,7 +270,7 @@ window.VGSubs = (function () {
         '<div class="was">' + (p.desc ? '$ ' + amt(pl.base, c.moneda) + ' ' + h(perMes(c.moneda)) : '') + '</div>' +
         '<div class="now">$ ' + amt(mes, c.moneda) + ' <small>' + h(perMes(c.moneda)) + '</small></div>' +
         '<div class="tot">' + (p.meses > 1 ? 'Total a pagar por ' + (p.meses === 12 ? 'año' : 'trimestre') + ': $ ' + amt(mes * p.meses, c.moneda) : 'Se cobra mes a mes') + '</div>' +
-        '<ul>' + c.funciones.map(function (f) { return pl.no.indexOf(f) >= 0 ? '<li class="no">No incluye ' + h(f.charAt(0).toLowerCase() + f.slice(1)) + '</li>' : '<li>' + h(f) + '</li>'; }).join('') + '</ul>' +
+        '<ul>' + feats(o.app).map(function (x) { return x[0]; }).map(function (f) { return (pl.id === 'esencial' && soloPro(o.app).indexOf(f) >= 0) ? '<li class="no">No incluye ' + h(f.charAt(0).toLowerCase() + f.slice(1)) + '</li>' : '<li>' + h(f) + '</li>'; }).join('') + '</ul>' +
         '<button class="vgs-btn wide ' + (pl.recomendado ? 'accent' : '') + '" data-vgs-pay="' + pl.id + '">' + (c.links[pl.id + '_' + p.id] ? '💳 Pagar ' + h(p.nombre.toLowerCase()) : 'Elegir plan') + '</button></div></article>';
     }).join('');
     return (blocking ? '' : '<button class="vgs-x" data-vgs-close aria-label="Cerrar">×</button>') + aviso +
@@ -320,6 +337,7 @@ window.VGSubs = (function () {
     var st = cur && cur.st, html = st && st.state === 'prueba' ? trialHTML(st) : '';
     if (html) css();
     document.querySelectorAll('[data-vgs-trial]').forEach(function (el) {
+      if (el.closest('.vgs-ov') || el.tagName === 'BUTTON') return;
       if (el.getAttribute('data-vgs-k') === html) return;
       el.setAttribute('data-vgs-k', html); el.innerHTML = html;
       var b = el.querySelector('[data-vgs-verplanes]'); if (b) b.onclick = function (ev) { ev.preventDefault(); ev.stopPropagation(); showPlans(cur && cur.opts, cur && cur.st, false); };
@@ -330,11 +348,70 @@ window.VGSubs = (function () {
       trialObs.observe(document.body, { childList: true, subtree: true });
     }
   }
+  // ---------- plan Esencial: funciones del Pro y uso desde la computadora ----------
+  var deskEl = null, proBound = false;
+  function tier() { var st = cur && cur.st; return st && st.state === 'activo' && String(st.plan || '').split('_')[0] === 'esencial' ? 'esencial' : 'completo'; }
+  function allowed(f) { return tier() !== 'esencial' || soloPro(cur && cur.opts && cur.opts.app).indexOf(f) < 0; }
+  function bindPro() {
+    if (proBound) return; proBound = true;
+    document.addEventListener('click', function (ev) {
+      var b = ev.target.closest && ev.target.closest('[data-vgs-verplanes]');
+      if (!b || b.closest('[data-vgs-trial]') || !cur) return;
+      ev.preventDefault(); ev.stopPropagation();
+      var ov = b.closest('.vgs-ov'); if (ov && ov !== (deskEl && deskEl.el) && ov.parentNode) ov.parentNode.removeChild(ov);
+      showPlans(cur.opts, cur.st, false);
+    }, true);
+  }
+  // Devuelve true si se puede usar; si no, explica que es del plan Pro
+  function pro(f) {
+    if (allowed(f)) return true;
+    bindPro();
+    modal('<button class="vgs-x" data-vgs-close aria-label="Cerrar">×</button><span class="vgs-eyebrow">Plan Pro</span><h2>' + h(f) + '</h2>' +
+      '<p class="vgs-mut" style="font-size:15px;margin-top:6px">Esta función está incluida en el plan <b>Pro (App + Web)</b>. Tu plan actual es Esencial.</p>' +
+      '<div class="vgs-row" style="margin-top:18px"><button class="vgs-btn accent" data-vgs-verplanes>Ver planes</button><button class="vgs-btn light" data-vgs-close>Ahora no</button></div>');
+    return false;
+  }
+  // Tapa una sección con un aviso del plan Pro (sin romper lo que hay debajo)
+  function lock(el, f) {
+    if (!el) return false;
+    var old = el.querySelector(':scope > .vgs-lock');
+    if (allowed(f)) { if (old) old.parentNode.removeChild(old); return false; }
+    if (old) return true;
+    css(); bindPro();
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    if (el.offsetHeight < 200) el.style.minHeight = '200px';
+    var d = document.createElement('div'); d.className = 'vgs-lock';
+    d.innerHTML = '<div><b>🔒 ' + h(f) + '</b><p>Disponible en el plan Pro (App + Web).</p><button type="button" data-vgs-verplanes>Ver planes</button></div>';
+    el.appendChild(d); return true;
+  }
+  // Tarjeta para poner en lugar de una sección del plan Pro ('' si se puede usar)
+  function locked(f) {
+    if (allowed(f)) return '';
+    css(); bindPro();
+    return '<div class="vgs-lockcard"><b>🔒 ' + h(f) + '</b><p>Disponible en el plan Pro (App + Web). Con el plan Esencial seguís usando todo lo demás.</p><button type="button" data-vgs-verplanes>Ver planes</button></div>';
+  }
+  function isDesk() {
+    try { return window.matchMedia('(hover: hover) and (pointer: fine)').matches && Math.min(screen.width, screen.height) >= 700; } catch (_) { return false; }
+  }
+  function desk() {
+    var need = !!(cur && cur.st && cur.st.state !== 'vencido' && tier() === 'esencial' && isDesk());
+    if (!need) { if (deskEl) { deskEl.close(); deskEl = null; document.documentElement.style.overflow = ''; } return; }
+    if (deskEl) return;
+    bindPro();
+    deskEl = modal('<span class="vgs-eyebrow">Plan Esencial (App)</span><h2>Tu plan es para usar desde el celular</h2>' +
+      '<p class="vgs-mut" style="font-size:15px;margin-top:6px">Para usar ' + h(APPS[cur.opts.app] || 'la app') + ' desde la computadora pasate al plan <b>Pro (App + Web)</b>. Mientras tanto, entrá desde tu celular: tus datos están guardados en la nube.</p>' +
+      '<div class="vgs-row" style="margin-top:18px"><button class="vgs-btn accent" data-vgs-verplanes>Ver planes</button><button class="vgs-btn light" data-vgs-deskwa>Escribir por WhatsApp</button>' + (cur.opts.onLogout ? '<button class="vgs-btn light" data-vgs-desklogout>Cerrar sesión</button>' : '') + '</div>', { blocking: true });
+    document.documentElement.style.overflow = 'hidden';
+    var lo = deskEl.el.querySelector('[data-vgs-desklogout]'); if (lo) lo.onclick = function () { var f = cur && cur.opts.onLogout; if (deskEl) { deskEl.close(); deskEl = null; document.documentElement.style.overflow = ''; } if (f) f(); };
+    var w = deskEl.el.querySelector('[data-vgs-deskwa]'); if (w) w.onclick = function () { wa('Hola VentiunGo, quiero pasar mi cuenta de ' + (APPS[cur.opts.app] || '') + (cur.opts.nombre ? ' (' + cur.opts.nombre + ')' : '') + ' al plan Pro para usarla en la computadora.'); };
+  }
+
   function apply() {
     if (!cur || !cur.st) return;
     if (cur.st.state === 'vencido') { pill(null); showPlans(cur.opts, cur.st, true); }
     else { hideBlock(); pill(cur.st); }
-    fillTrial();
+    bindPro(); fillTrial(); desk();
+    try { document.dispatchEvent(new CustomEvent('vgs:plan', { detail: { tier: tier() } })); } catch (_) {}
   }
   function onData(d) {
     if (!cur) return;
@@ -368,7 +445,7 @@ window.VGSubs = (function () {
   }
   function stop() {
     if (cur && cur.unsub) { try { cur.unsub(); } catch (_) {} }
-    cur = null; hideBlock(); pill(null); fillTrial();
+    cur = null; hideBlock(); pill(null); fillTrial(); desk();
   }
 
   // ---------- soporte ----------
@@ -482,6 +559,7 @@ window.VGSubs = (function () {
   function showCatalog(o) { showPlans({ db: o.db, app: o.app, nombre: '', sid: '' }, null, false); }
 
   return { guard: guard, stop: stop, showCatalog: showCatalog, showPlans: function () { if (cur) showPlans(cur.opts, cur.st, false); }, current: function () { return cur && cur.sid; }, state: function () { return cur && cur.st; },
+    tier: tier, allowed: allowed, pro: pro, lock: lock, locked: locked,
     admin: admin, plansEditor: plansEditor, badge: badge, listAll: listAll, compute: compute, TRIAL_DAYS: TRIAL_DAYS };
 })();
 
